@@ -182,7 +182,7 @@ WaitTurnOrderManager.getMapTotalWT() >= 1000
 
 
 【作者】
-さんごぱん(https://twitter.com/sangoopan)
+さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
 SRPG Studio version:1.291

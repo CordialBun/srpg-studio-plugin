@@ -82,7 +82,7 @@ SGP_drawCurTakenBonus(x, y, turnState);
 
 
 【作者】
-さんごぱん(https://twitter.com/sangoopan)
+さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
 SRPG Studio version:1.302

@@ -27,7 +27,7 @@ XXには任意の数値を入力してください(被特効時にこの数値�
 
 
 【作者】
-さんごぱん(https://twitter.com/sangoopan)
+さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
 SRPG Studio version:1.302
