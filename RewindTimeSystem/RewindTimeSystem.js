@@ -42,7 +42,8 @@ Ver.1.1  2024/5/20  古いバージョンのSRPG Studioを使用していると�
                     乱数取得をroot.getRandomNumber()で行っていた箇所をProbability.getRandomNumber()に変更。
 Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
-Ver.1.30 2024/11/03  相対ターンの巻き戻しに対応。
+Ver.1.30 2024/11/03 相対ターンの巻き戻しに対応。
+                    場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -120,10 +121,13 @@ var RecordType = {
     UNIT_VILLAGE: 12, // 村
     UNIT_SHOP: 13, // 店
     UNIT_GATE: 14, // 扉
-    UNIT_ITEM: 15, // アイテム
-    UNIT_WAIT: 16, // 待機
-    PROGRESS_ENEMYPHASE: 17, // 敵軍フェイズ進行中
-    PROGRESS_ALLYPHASE: 18 // 同盟軍フェイズ進行中
+    UNIT_QUICK: 15, // 行動回復
+    UNIT_PLACECOMMAND: 16, // 場所イベント
+    UNIT_ITEM: 17, // アイテム
+    UNIT_TALK: 18, // 会話
+    UNIT_WAIT: 19, // 待機
+    PROGRESS_ENEMYPHASE: 20, // 敵軍フェイズ進行中
+    PROGRESS_ALLYPHASE: 21 // 同盟軍フェイズ進行中
 };
 
 // レコードの種類に対応する文字列
@@ -144,10 +148,21 @@ var RecordTitleString = {
     12: "が訪問した", // 村
     13: "が店に入った", // 店
     14: "が扉を開けた", // 扉
-    15: "がアイテムを使った", // アイテム
-    16: "が待機した", // 待機
-    17: "敵軍フェイズ進行中", // 敵軍フェイズ進行中
-    18: "同盟軍フェイズ進行中" // 同盟軍フェイズ進行中
+    15: "が踊った", // 行動回復
+    17: "がアイテムを使った", // アイテム
+    19: "が待機した", // 待機
+    20: "敵軍フェイズ進行中", // 敵軍フェイズ進行中
+    21: "同盟軍フェイズ進行中" // 同盟軍フェイズ進行中
+};
+
+// 場所イベントに対応する文字列
+var PlaceCommandRecordTitleString = {
+    調べる: "が調べた"
+};
+
+// 会話イベントに対応する文字列
+var TalkCommandRecordTitleString = {
+    会話: "が会話した"
 };
 
 // 設定項目はここまで
@@ -171,6 +186,8 @@ var RewindTimeManager = {
     _isIgnoredGlobalSwitchArray: null,
     _isIgnoredLocalSwitchArray: null,
     _curRecordType: 0,
+    _placeCommandName: null,
+    _talkCommandName: null,
     _curActionUnit: null,
     _isRepeatMoveMode: false,
     _isRewinded: false,
@@ -246,6 +263,8 @@ var RewindTimeManager = {
         this._isIgnoredGlobalSwitchArray = globalCustom.isIgnoredGlobalSwitchArray;
         this._isIgnoredLocalSwitchArray = globalCustom.isIgnoredLocalSwitchArray;
         this._curRecordType = RecordType.UNIT_WAIT;
+        this._placeCommandName = "";
+        this._talkCommandName = "";
         this._curActionUnit = null;
         this._isRewinded = false;
         this._srpgStudioScriptVersion = root.getScriptVersion();
@@ -2314,7 +2333,7 @@ var RewindTimeManager = {
     },
 
     getRecordTitleArray: function () {
-        var i, count, record, recordType, unitName, text, recordTitle;
+        var i, count, record, recordType, unitName, text, recordTitle, placeCommandName, talkCommandName;
         var recordTitleArray = [];
         var recordArray = this._recordArray;
 
@@ -2322,8 +2341,17 @@ var RewindTimeManager = {
         for (i = 0; i < count; i++) {
             record = recordArray[i];
             recordType = record.recordType;
+            placeCommandName = this.getPlaceCommandName();
+            talkCommandName = this.getTalkCommandName();
             unitName = record.unitName;
-            text = unitName + RecordTitleString[recordType];
+
+            if (recordType === RecordType.UNIT_PLACECOMMAND) {
+                text = unitName + PlaceCommandRecordTitleString[placeCommandName];
+            } else if (recordType === RecordType.UNIT_TALK) {
+                text = unitName + TalkCommandRecordTitleString[talkCommandName];
+            } else {
+                text = unitName + RecordTitleString[recordType];
+            }
 
             if (recordType === RecordType.TURN_START) {
                 text = record.turnCount + text;
@@ -2404,6 +2432,22 @@ var RewindTimeManager = {
 
     setCurRecordType: function (recordType) {
         this._curRecordType = recordType;
+    },
+
+    getPlaceCommandName: function () {
+        return this._placeCommandName;
+    },
+
+    setPlaceCommandName: function (placeCommandName) {
+        this._placeCommandName = placeCommandName;
+    },
+
+    getTalkCommandName: function () {
+        return this._talkCommandName;
+    },
+
+    setTalkCommandName: function (talkCommandName) {
+        this._talkCommandName = talkCommandName;
     },
 
     getCurActionUnit: function () {
@@ -3374,6 +3418,32 @@ var GetNumberTokenStateType = {
         alias018.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONTRADE);
+    };
+
+    // 行動回復
+    var alias019 = UnitCommand.Quick.openCommand;
+    UnitCommand.Quick.openCommand = function () {
+        alias019.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_QUICK);
+    };
+
+    // 場所イベント(カスタム)
+    var alias020 = UnitCommand.PlaceCommand.openCommand;
+    UnitCommand.PlaceCommand.openCommand = function () {
+        alias020.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_PLACECOMMAND);
+        RewindTimeManager.setPlaceCommandName(this.getCommandName());
+    };
+
+    // 会話
+    var alias021 = UnitCommand.Talk.openCommand;
+    UnitCommand.Talk.openCommand = function () {
+        alias021.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_TALK);
+        RewindTimeManager.setTalkCommandName(this.getCommandName());
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
