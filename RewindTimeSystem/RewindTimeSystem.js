@@ -45,7 +45,8 @@ Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が
 Ver.1.30 2024/11/03 相対ターンの巻き戻しに対応。
                     場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
                     データ設定での武器やアイテムの並び順がIDと一致していないとき、ストック等のアイテムの巻き戻しが正常に動作しない不具合を修正。
-                    顔画像を「なし」に設定しているユニットの巻き戻しが正常に動作しない不具合を修正
+                    顔画像を「なし」に設定しているユニットの巻き戻しが正常に動作しない不具合を修正。
+                    巻き戻し画面の確認ウィンドウに指カーソルが表示されない不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -4027,9 +4028,11 @@ var GetNumberTokenStateType = {
             }
 
             if (result === RewindSelectResult.SELECT) {
+                this._rewindQuestionWindow.setQuestionActive(true);
                 this.changeCycleMode(RewindTimeMode.REWINDQUESTION);
             } else if (result === RewindSelectResult.CANCEL) {
                 if (this._isGameOverRewind) {
+                    this._cancelQuestionWindow.setQuestionActive(true);
                     this.changeCycleMode(RewindTimeMode.CANCELQUESTION);
                 } else {
                     RewindTimeManager.rewindLatest(true);
