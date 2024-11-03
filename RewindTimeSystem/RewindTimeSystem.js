@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「時戻しプラグイン」 Ver.1.21
+時戻しシステム Ver.1.30
 
 
 【概要】
@@ -20,14 +20,14 @@
 
 【使い方】
 下記のURLからマニュアルを参照してください。
-https://github.com/sangoopan/srpg-studio-plugin/tree/master/RewindTimeSystem#readme
+https://github.com/CordialBun/srpg-studio-plugin/tree/master/RewindTimeSystem#readme
 
 
 【作者】
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.294
+SRPG Studio version:1.303
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -42,6 +42,14 @@ Ver.1.1  2024/5/20  古いバージョンのSRPG Studioを使用していると�
                     乱数取得をroot.getRandomNumber()で行っていた箇所をProbability.getRandomNumber()に変更。
 Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
+Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変更。
+                    相対ターンの巻き戻しに対応。
+                    場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
+                    データ設定での武器やアイテムの並び順がIDと一致していないとき、ストック等のアイテムの巻き戻しが正常に動作しない不具合を修正。
+                    顔画像を「なし」に設定しているユニットの巻き戻しが正常に動作しない不具合を修正。
+                    巻き戻し画面の確認ウィンドウに指カーソルが表示されない不具合を修正。
+                    ボーナスの巻き戻しが正常に動作しない不具合を修正。
+                    透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -119,10 +127,13 @@ var RecordType = {
     UNIT_VILLAGE: 12, // 村
     UNIT_SHOP: 13, // 店
     UNIT_GATE: 14, // 扉
-    UNIT_ITEM: 15, // アイテム
-    UNIT_WAIT: 16, // 待機
-    PROGRESS_ENEMYPHASE: 17, // 敵軍フェイズ進行中
-    PROGRESS_ALLYPHASE: 18 // 同盟軍フェイズ進行中
+    UNIT_QUICK: 15, // 行動回復
+    UNIT_PLACECOMMAND: 16, // 場所イベント
+    UNIT_ITEM: 17, // アイテム
+    UNIT_TALK: 18, // 会話
+    UNIT_WAIT: 19, // 待機
+    PROGRESS_ENEMYPHASE: 20, // 敵軍フェイズ進行中
+    PROGRESS_ALLYPHASE: 21 // 同盟軍フェイズ進行中
 };
 
 // レコードの種類に対応する文字列
@@ -143,10 +154,21 @@ var RecordTitleString = {
     12: "が訪問した", // 村
     13: "が店に入った", // 店
     14: "が扉を開けた", // 扉
-    15: "がアイテムを使った", // アイテム
-    16: "が待機した", // 待機
-    17: "敵軍フェイズ進行中", // 敵軍フェイズ進行中
-    18: "同盟軍フェイズ進行中" // 同盟軍フェイズ進行中
+    15: "が踊った", // 行動回復
+    17: "がアイテムを使った", // アイテム
+    19: "が待機した", // 待機
+    20: "敵軍フェイズ進行中", // 敵軍フェイズ進行中
+    21: "同盟軍フェイズ進行中" // 同盟軍フェイズ進行中
+};
+
+// 場所イベントに対応する文字列
+var PlaceCommandRecordTitleString = {
+    調べる: "が調べた"
+};
+
+// 会話イベントに対応する文字列
+var TalkCommandRecordTitleString = {
+    会話: "が会話した"
 };
 
 // 設定項目はここまで
@@ -170,6 +192,8 @@ var RewindTimeManager = {
     _isIgnoredGlobalSwitchArray: null,
     _isIgnoredLocalSwitchArray: null,
     _curRecordType: 0,
+    _placeCommandName: null,
+    _talkCommandName: null,
     _curActionUnit: null,
     _isRepeatMoveMode: false,
     _isRewinded: false,
@@ -245,6 +269,8 @@ var RewindTimeManager = {
         this._isIgnoredGlobalSwitchArray = globalCustom.isIgnoredGlobalSwitchArray;
         this._isIgnoredLocalSwitchArray = globalCustom.isIgnoredLocalSwitchArray;
         this._curRecordType = RecordType.UNIT_WAIT;
+        this._placeCommandName = "";
+        this._talkCommandName = "";
         this._curActionUnit = null;
         this._isRewinded = false;
         this._srpgStudioScriptVersion = root.getScriptVersion();
@@ -341,10 +367,7 @@ var RewindTimeManager = {
                             this.rewindAllUnit(record[key]);
                             break;
                         case "mapChipHandleParamArray": // マップチップ
-                            this.rewindMapChip(record[key], false, curSession);
-                            break;
-                        case "layerMapChipHandleParamArray": // マップチップ(透過レイヤー)
-                            this.rewindMapChip(record[key], true, curSession);
+                            this.rewindMapChip(record, curSession);
                             break;
                         case "mapCursorParam": // マップカーソル
                             this.rewindMapCursor(record[key], curSession);
@@ -402,6 +425,9 @@ var RewindTimeManager = {
                             break;
                         case "turnCount": // ターン数
                             this.rewindTurnCount(record[key], curSession);
+                            break;
+                        case "relativeTurnCount": // 相対ターン数
+                            this.rewindRelativeTurnCount(record[key], curSession);
                             break;
                         case "turnType": // フェイズ
                             this.rewindTurnType(record[key], curSession);
@@ -573,13 +599,19 @@ var RewindTimeManager = {
     },
 
     rewindFace: function (unit, faceParam) {
+        var handle;
         var isRuntime = faceParam.handleType;
+        var isNullHandle = faceParam.isNullHandle;
         var id = faceParam.resourceId;
         var srcX = faceParam.srcX;
         var srcY = faceParam.srcY;
-        var handle = root.createResourceHandle(isRuntime, id, 0, srcX, srcY);
 
-        unit.setFaceResourceHandle(handle);
+        if (isNullHandle) {
+            unit.setFaceResourceHandle(root.createEmptyHandle());
+        } else {
+            handle = root.createResourceHandle(isRuntime, id, 0, srcX, srcY);
+            unit.setFaceResourceHandle(handle);
+        }
     },
 
     rewindParamValue: function (unit, valueArray) {
@@ -738,11 +770,14 @@ var RewindTimeManager = {
         }
     },
 
-    rewindMapChip: function (handleParamArray, isLayer, curSession) {
+    rewindMapChip: function (record, curSession) {
         var i, mapX, mapY, isRuntime, resourceId, colorIndex, srcX, srcY, handle, handleParam;
+        var mapChipHandleParamArray = record.mapChipHandleParamArray;
+        var layerChipHandleParamArray = record.layerChipHandleParamArray;
 
-        for (i = 0; i < handleParamArray.length; i++) {
-            handleParam = handleParamArray[i];
+        for (i = 0; i < mapChipHandleParamArray.length; i++) {
+            // 非透過レイヤー
+            handleParam = mapChipHandleParamArray[i];
             mapX = handleParam.mx;
             mapY = handleParam.my;
             isRuntime = handleParam.is;
@@ -751,7 +786,19 @@ var RewindTimeManager = {
             srcX = handleParam.sx;
             srcY = handleParam.sy;
             handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
-            curSession.setMapChipGraphicsHandle(mapX, mapY, isLayer, handle);
+            curSession.setMapChipGraphicsHandle(mapX, mapY, false, handle);
+
+            // 透過レイヤー
+            handleParam = layerChipHandleParamArray[i];
+            mapX = handleParam.mx;
+            mapY = handleParam.my;
+            isRuntime = handleParam.is;
+            resourceId = handleParam.id;
+            colorIndex = handleParam.c;
+            srcX = handleParam.sx;
+            srcY = handleParam.sy;
+            handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
+            curSession.setMapChipGraphicsHandle(mapX, mapY, true, handle);
         }
     },
 
@@ -784,9 +831,9 @@ var RewindTimeManager = {
             itemParam = stockItemParamArray[i];
 
             if (itemParam.isWeapon) {
-                baseItem = this._weaponList.getData(itemParam.itemId);
+                baseItem = this._weaponList.getDataFromId(itemParam.itemId);
             } else {
-                baseItem = this._itemList.getData(itemParam.itemId);
+                baseItem = this._itemList.getDataFromId(itemParam.itemId);
             }
 
             item = root.duplicateItem(baseItem);
@@ -879,6 +926,10 @@ var RewindTimeManager = {
         curSession.setTurnCount(turnCount);
     },
 
+    rewindRelativeTurnCount: function (relativeTurnCount, curSession) {
+        curSession.setRelativeTurnCount(relativeTurnCount);
+    },
+
     rewindTurnType: function (turnType, curSession) {
         curSession.setTurnType(turnType);
     },
@@ -898,9 +949,9 @@ var RewindTimeManager = {
             switch (trophyFlag) {
                 case TrophyFlag.ITEM:
                     if (trophyParam.isWeapon) {
-                        baseItem = this._weaponList.getData(trophyParam.itemId);
+                        baseItem = this._weaponList.getDataFromId(trophyParam.itemId);
                     } else {
-                        baseItem = this._itemList.getData(trophyParam.itemId);
+                        baseItem = this._itemList.getDataFromId(trophyParam.itemId);
                     }
 
                     item = root.duplicateItem(baseItem);
@@ -953,9 +1004,9 @@ var RewindTimeManager = {
                 inventory = inventoryNumberArray[j];
 
                 if (itemParam.isWeapon) {
-                    baseItem = this._weaponList.getData(itemParam.itemId);
+                    baseItem = this._weaponList.getDataFromId(itemParam.itemId);
                 } else {
-                    baseItem = this._itemList.getData(itemParam.itemId);
+                    baseItem = this._itemList.getDataFromId(itemParam.itemId);
                 }
 
                 item = root.duplicateItem(baseItem);
@@ -988,9 +1039,9 @@ var RewindTimeManager = {
                 inventory = inventoryNumberArray[j];
 
                 if (itemParam.isWeapon) {
-                    baseItem = this._weaponList.getData(itemParam.itemId);
+                    baseItem = this._weaponList.getDataFromId(itemParam.itemId);
                 } else {
-                    baseItem = this._itemList.getData(itemParam.itemId);
+                    baseItem = this._itemList.getDataFromId(itemParam.itemId);
                 }
 
                 item = root.duplicateItem(baseItem);
@@ -1082,6 +1133,8 @@ var RewindTimeManager = {
         var latestRecord = this._latestRecord;
         var metaSession = root.getMetaSession();
         var curSession = root.getCurrentSession();
+        var latestMapChipHandleParamArray = latestRecord.mapChipHandleParamArray;
+        var latestLayerChipHandleParamArray = latestRecord.layerChipHandleParamArray;
 
         this.createUnitRecord(record, newLatestRecord, latestRecord, isFirstRecord);
         this.createGoldRecord(record, newLatestRecord, latestRecord.gold, isFirstRecord, metaSession);
@@ -1101,10 +1154,10 @@ var RewindTimeManager = {
         this.createMapCursorRecord(record, newLatestRecord, latestRecord.mapCursorParam, isFirstRecord, curSession);
         this.createScrollPixelRecord(record, newLatestRecord, latestRecord.scrollPixelParam, isFirstRecord, curSession);
         this.createTurnCountRecord(record, newLatestRecord, latestRecord.turnCount, isFirstRecord, curSession);
+        this.createRelativeTurnCountRecord(record, newLatestRecord, latestRecord.relativeTurnCount, isFirstRecord, curSession);
         this.createTurnTypeRecord(record, newLatestRecord, latestRecord.turnType, isFirstRecord, curSession);
         this.createTrophyRecord(record, newLatestRecord, latestRecord.trophyParamArray, isFirstRecord, curSession);
-        this.createMapChipRecord(record, newLatestRecord, latestRecord.mapChipHandleParamArray, isFirstRecord, false, curSession);
-        this.createMapChipRecord(record, newLatestRecord, latestRecord.layerMapChipHandleParamArray, isFirstRecord, true, curSession);
+        this.createMapChipRecord(record, newLatestRecord, latestMapChipHandleParamArray, latestLayerChipHandleParamArray, isFirstRecord, curSession);
         this.createMusicRecord(record, newLatestRecord, latestRecord.musicHandleParam, isFirstRecord);
         this.createScreenEffectRecord(record, newLatestRecord, latestRecord.screenEffectParam, isFirstRecord);
         this.createSwitchRecord(record, newLatestRecord, latestRecord.localSwitchParamArray, isFirstRecord, false, curSession);
@@ -1212,10 +1265,12 @@ var RewindTimeManager = {
         var handle = unit.getFaceResourceHandle();
 
         faceParam.handleType = handle.getHandleType();
+        faceParam.isNullHandle = handle.isNullHandle();
         faceParam.resourceId = handle.getResourceId();
         faceParam.srcX = handle.getSrcX();
         faceParam.srcY = handle.getSrcY();
         newLatestFaceParam.handleType = faceParam.handleType;
+        newLatestFaceParam.isNullHandle = faceParam.isNullHandle;
         newLatestFaceParam.resourceId = faceParam.resourceId;
         newLatestFaceParam.srcX = faceParam.srcX;
         newLatestFaceParam.srcY = faceParam.srcY;
@@ -1977,6 +2032,17 @@ var RewindTimeManager = {
         newLatestRecord.turnCount = newLatestTurnCount;
     },
 
+    createRelativeTurnCountRecord: function (record, newLatestRecord, latestRelativeTurnCount, isFirstRecord, curSession) {
+        var relativeTurnCount = curSession.getRelativeTurnCount();
+        var newLatestRelativeTurnCount = relativeTurnCount;
+
+        if (isFirstRecord || relativeTurnCount !== latestRelativeTurnCount) {
+            record.relativeTurnCount = relativeTurnCount;
+        }
+
+        newLatestRecord.relativeTurnCount = newLatestRelativeTurnCount;
+    },
+
     createTurnTypeRecord: function (record, newLatestRecord, latestTurnType, isFirstRecord, curSession) {
         var turnType = curSession.getTurnType();
         var newLatestTurnType = turnType;
@@ -2034,62 +2100,106 @@ var RewindTimeManager = {
         newLatestRecord.trophyParamArray = newLatestTrophyParamArray;
     },
 
-    createMapChipRecord: function (record, newLatestRecord, latestHandleParamArray, isFirstRecord, isLayer, curSession) {
-        var x, y, key, handle, handleParam, latestHandleParam, newLatestHandleParam;
+    createMapChipRecord: function (
+        record,
+        newLatestRecord,
+        latestMapChipHandleParamArray,
+        latestLayerChipHandleParamArray,
+        isFirstRecord,
+        curSession
+    ) {
+        var x, y, handle, mapChipHandleParam, layerChipHandleParam, latestMapChipHandleParam, latestLayerChipHandleParam;
+        var newLatestMapChipHandleParam, newLatestLayerChipHandleParam;
         var mapData = curSession.getCurrentMapInfo();
         var mapWidth = mapData.getMapWidth();
         var mapHeight = mapData.getMapHeight();
-        var handleParamArray = [];
-        var newLatestHandleParamArray = [];
-
-        if (isLayer) {
-            key = "layerMapChipHandleParamArray";
-        } else {
-            key = "mapChipHandleParamArray";
-        }
+        var mapChipHandleParamArray = [];
+        var layerChipHandleParamArray = [];
+        var newLatestMapChipHandleParamArray = [];
+        var newLatestLayerChipHandleParamArray = [];
 
         for (y = 0; y < mapHeight; y++) {
-            newLatestHandleParamArray.push([]);
+            newLatestMapChipHandleParamArray.push([]);
+            newLatestLayerChipHandleParamArray.push([]);
 
             for (x = 0; x < mapWidth; x++) {
-                handle = curSession.getMapChipGraphicsHandle(x, y, isLayer);
-                handleParam = {};
-                newLatestHandleParam = {};
-                latestHandleParam = {};
+                // 非透過レイヤー
+                handle = curSession.getMapChipGraphicsHandle(x, y, false);
+                mapChipHandleParam = {};
+                newLatestMapChipHandleParam = {};
+                latestMapChipHandleParam = {};
 
-                handleParam.mx = x;
-                handleParam.my = y;
-                handleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
-                handleParam.id = handle.getResourceId();
-                handleParam.c = handle.getColorIndex();
-                handleParam.sx = handle.getSrcX();
-                handleParam.sy = handle.getSrcY();
-                newLatestHandleParam.mx = x;
-                newLatestHandleParam.my = y;
-                newLatestHandleParam.is = handleParam.is;
-                newLatestHandleParam.id = handleParam.id;
-                newLatestHandleParam.c = handleParam.c;
-                newLatestHandleParam.sx = handleParam.sx;
-                newLatestHandleParam.sy = handleParam.sy;
+                mapChipHandleParam.mx = x;
+                mapChipHandleParam.my = y;
+                mapChipHandleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
+                mapChipHandleParam.id = handle.getResourceId();
+                mapChipHandleParam.c = handle.getColorIndex();
+                mapChipHandleParam.sx = handle.getSrcX();
+                mapChipHandleParam.sy = handle.getSrcY();
+                newLatestMapChipHandleParam.mx = x;
+                newLatestMapChipHandleParam.my = y;
+                newLatestMapChipHandleParam.is = mapChipHandleParam.is;
+                newLatestMapChipHandleParam.id = mapChipHandleParam.id;
+                newLatestMapChipHandleParam.c = mapChipHandleParam.c;
+                newLatestMapChipHandleParam.sx = mapChipHandleParam.sx;
+                newLatestMapChipHandleParam.sy = mapChipHandleParam.sy;
 
-                if (latestHandleParamArray !== undefined) {
-                    latestHandleParam = latestHandleParamArray[y][x];
+                if (latestMapChipHandleParamArray !== undefined) {
+                    latestMapChipHandleParam = latestMapChipHandleParamArray[y][x];
                 }
 
-                if (!isFirstRecord && this.hasDiffProperties(handleParam, latestHandleParam)) {
-                    handleParamArray.push(handleParam);
-                    this.addBeforeChangedMapChip(latestHandleParam, isLayer);
+                // 透過レイヤー
+                handle = curSession.getMapChipGraphicsHandle(x, y, true);
+                layerChipHandleParam = {};
+                newLatestLayerChipHandleParam = {};
+                latestLayerChipHandleParam = {};
+
+                layerChipHandleParam.mx = x;
+                layerChipHandleParam.my = y;
+                layerChipHandleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
+                layerChipHandleParam.id = handle.getResourceId();
+                layerChipHandleParam.c = handle.getColorIndex();
+                layerChipHandleParam.sx = handle.getSrcX();
+                layerChipHandleParam.sy = handle.getSrcY();
+                newLatestLayerChipHandleParam.mx = x;
+                newLatestLayerChipHandleParam.my = y;
+                newLatestLayerChipHandleParam.is = layerChipHandleParam.is;
+                newLatestLayerChipHandleParam.id = layerChipHandleParam.id;
+                newLatestLayerChipHandleParam.c = layerChipHandleParam.c;
+                newLatestLayerChipHandleParam.sx = layerChipHandleParam.sx;
+                newLatestLayerChipHandleParam.sy = layerChipHandleParam.sy;
+
+                if (latestLayerChipHandleParamArray !== undefined) {
+                    latestLayerChipHandleParam = latestLayerChipHandleParamArray[y][x];
                 }
 
-                newLatestHandleParamArray[y].push(newLatestHandleParam);
+                // 透過レイヤーか非透過レイヤーのどちらかが変更されているならレコードに両方記録する
+                if (
+                    !isFirstRecord &&
+                    (this.hasDiffProperties(mapChipHandleParam, latestMapChipHandleParam) ||
+                        this.hasDiffProperties(layerChipHandleParam, latestLayerChipHandleParam))
+                ) {
+                    mapChipHandleParamArray.push(mapChipHandleParam);
+                    layerChipHandleParamArray.push(layerChipHandleParam);
+                    this.addBeforeChangedMapChip(latestMapChipHandleParam, false);
+                    this.addBeforeChangedMapChip(latestLayerChipHandleParam, true);
+                }
+
+                newLatestMapChipHandleParamArray[y].push(newLatestMapChipHandleParam);
+                newLatestLayerChipHandleParamArray[y].push(newLatestLayerChipHandleParam);
             }
         }
 
-        if (handleParamArray.length > 0) {
-            record[key] = handleParamArray;
+        if (mapChipHandleParamArray.length > 0) {
+            record.mapChipHandleParamArray = mapChipHandleParamArray;
         }
 
-        newLatestRecord[key] = newLatestHandleParamArray;
+        if (layerChipHandleParamArray.length > 0) {
+            record.layerChipHandleParamArray = layerChipHandleParamArray;
+        }
+
+        newLatestRecord.mapChipHandleParamArray = newLatestMapChipHandleParamArray;
+        newLatestRecord.layerChipHandleParamArray = newLatestLayerChipHandleParamArray;
     },
 
     createMusicRecord: function (record, newLatestRecord, latestMusicHandleParam, isFirstRecord) {
@@ -2294,7 +2404,7 @@ var RewindTimeManager = {
     },
 
     getRecordTitleArray: function () {
-        var i, count, record, recordType, unitName, text, recordTitle;
+        var i, count, record, recordType, unitName, text, recordTitle, placeCommandName, talkCommandName;
         var recordTitleArray = [];
         var recordArray = this._recordArray;
 
@@ -2302,8 +2412,17 @@ var RewindTimeManager = {
         for (i = 0; i < count; i++) {
             record = recordArray[i];
             recordType = record.recordType;
+            placeCommandName = this.getPlaceCommandName();
+            talkCommandName = this.getTalkCommandName();
             unitName = record.unitName;
-            text = unitName + RecordTitleString[recordType];
+
+            if (recordType === RecordType.UNIT_PLACECOMMAND) {
+                text = unitName + PlaceCommandRecordTitleString[placeCommandName];
+            } else if (recordType === RecordType.UNIT_TALK) {
+                text = unitName + TalkCommandRecordTitleString[talkCommandName];
+            } else {
+                text = unitName + RecordTitleString[recordType];
+            }
 
             if (recordType === RecordType.TURN_START) {
                 text = record.turnCount + text;
@@ -2384,6 +2503,22 @@ var RewindTimeManager = {
 
     setCurRecordType: function (recordType) {
         this._curRecordType = recordType;
+    },
+
+    getPlaceCommandName: function () {
+        return this._placeCommandName;
+    },
+
+    setPlaceCommandName: function (placeCommandName) {
+        this._placeCommandName = placeCommandName;
+    },
+
+    getTalkCommandName: function () {
+        return this._talkCommandName;
+    },
+
+    setTalkCommandName: function (talkCommandName) {
+        this._talkCommandName = talkCommandName;
     },
 
     getCurActionUnit: function () {
@@ -3185,9 +3320,9 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時の処理
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias00000 = ReinforcementChecker._appearUnit;
+    var alias000 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias00000.call(this, pageData, x, y);
+        var unit = alias000.call(this, pageData, x, y);
 
         if (unit !== null) {
             RewindTimeManager.addUnit(unit);
@@ -3200,15 +3335,15 @@ var GetNumberTokenStateType = {
         各ユニットコマンドに対応するレコードの種類を設定する
     *----------------------------------------------------------------------------------------------------------------*/
     // 攻撃
-    var alias000 = UnitCommand.Attack.openCommand;
+    var alias001 = UnitCommand.Attack.openCommand;
     UnitCommand.Attack.openCommand = function () {
-        alias000.call(this);
+        alias001.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_ATTACK);
     };
 
     // 待機
-    var alias001 = UnitCommand.Wait.openCommand;
+    var alias002 = UnitCommand.Wait.openCommand;
     UnitCommand.Wait.openCommand = function () {
         var curRecordType = RewindTimeManager.getCurRecordType();
         var isRepeatMoveMode = RewindTimeManager.isRepeatMoveMode();
@@ -3217,143 +3352,169 @@ var GetNumberTokenStateType = {
             RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
         }
 
-        alias001.call(this);
+        alias002.call(this);
     };
 
     // 占拠
-    var alias002 = UnitCommand.Occupation.openCommand;
+    var alias003 = UnitCommand.Occupation.openCommand;
     UnitCommand.Occupation.openCommand = function () {
-        alias002.call(this);
+        alias003.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_OCCUPATION);
     };
 
     // 宝箱
-    var alias003 = UnitCommand.Treasure.openCommand;
+    var alias004 = UnitCommand.Treasure.openCommand;
     UnitCommand.Treasure.openCommand = function () {
-        alias003.call(this);
+        alias004.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_TREASURE);
     };
 
     // 村
-    var alias004 = UnitCommand.Village.openCommand;
+    var alias005 = UnitCommand.Village.openCommand;
     UnitCommand.Village.openCommand = function () {
-        alias004.call(this);
+        alias005.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_VILLAGE);
     };
 
     // 店
-    var alias005 = UnitCommand.Shop.openCommand;
+    var alias006 = UnitCommand.Shop.openCommand;
     UnitCommand.Shop.openCommand = function () {
-        alias005.call(this);
+        alias006.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_SHOP);
     };
 
     // 扉
-    var alias006 = UnitCommand.Gate.openCommand;
+    var alias007 = UnitCommand.Gate.openCommand;
     UnitCommand.Gate.openCommand = function () {
-        alias006.call(this);
+        alias007.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_GATE);
     };
 
     // 盗む
-    var alias007 = UnitCommand.Steal.openCommand;
+    var alias008 = UnitCommand.Steal.openCommand;
     UnitCommand.Steal.openCommand = function () {
-        alias007.call(this);
+        alias008.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_STEAL);
     };
 
     // 杖
-    var alias008 = UnitCommand.Wand.openCommand;
+    var alias009 = UnitCommand.Wand.openCommand;
     UnitCommand.Wand.openCommand = function () {
-        alias008.call(this);
+        alias009.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAND);
     };
 
     // 情報
-    var alias009 = UnitCommand.Information.openCommand;
+    var alias010 = UnitCommand.Information.openCommand;
     UnitCommand.Information.openCommand = function () {
-        alias009.call(this);
+        alias010.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
     };
 
     // アイテム
-    var alias010 = UnitCommand.Item.openCommand;
+    var alias011 = UnitCommand.Item.openCommand;
     UnitCommand.Item.openCommand = function () {
-        alias010.call(this);
+        alias011.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_ITEM);
     };
 
     // 交換
-    var alias011 = UnitCommand.Trade.openCommand;
+    var alias012 = UnitCommand.Trade.openCommand;
     UnitCommand.Trade.openCommand = function () {
-        alias011.call(this);
-
-        RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
-    };
-
-    // ストック
-    var alias012 = UnitCommand.Stock.openCommand;
-    UnitCommand.Stock.openCommand = function () {
         alias012.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
     };
 
-    // 形態変化
-    var alias013 = UnitCommand.Metamorphoze.openCommand;
-    UnitCommand.Metamorphoze.openCommand = function () {
+    // ストック
+    var alias013 = UnitCommand.Stock.openCommand;
+    UnitCommand.Stock.openCommand = function () {
         alias013.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
+    };
+
+    // 形態変化
+    var alias014 = UnitCommand.Metamorphoze.openCommand;
+    UnitCommand.Metamorphoze.openCommand = function () {
+        alias014.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_METAMORPHOZE);
     };
 
     // 形態変化解除
-    var alias014 = UnitCommand.MetamorphozeCancel.openCommand;
+    var alias015 = UnitCommand.MetamorphozeCancel.openCommand;
     UnitCommand.MetamorphozeCancel.openCommand = function () {
-        alias014.call(this);
+        alias015.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_METAMORCANCEL);
     };
 
     // フュージョン攻撃
-    var alias015 = UnitCommand.FusionAttack.openCommand;
+    var alias016 = UnitCommand.FusionAttack.openCommand;
     UnitCommand.FusionAttack.openCommand = function () {
-        alias015.call(this);
+        alias016.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONATTACK);
     };
 
     // フュージョン(キャッチ)
-    var alias016 = UnitCommand.FusionCatch.openCommand;
+    var alias017 = UnitCommand.FusionCatch.openCommand;
     UnitCommand.FusionCatch.openCommand = function () {
-        alias016.call(this);
+        alias017.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONCATCH);
     };
 
     // フュージョン(リリース)
-    var alias017 = UnitCommand.FusionRelease.openCommand;
+    var alias018 = UnitCommand.FusionRelease.openCommand;
     UnitCommand.FusionRelease.openCommand = function () {
-        alias017.call(this);
+        alias018.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONRELEASE);
     };
 
     // フュージョン(トレード)
-    var alias018 = UnitCommand.FusionUnitTrade.openCommand;
+    var alias019 = UnitCommand.FusionUnitTrade.openCommand;
     UnitCommand.FusionUnitTrade.openCommand = function () {
-        alias018.call(this);
+        alias019.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONTRADE);
+    };
+
+    // 行動回復
+    var alias020 = UnitCommand.Quick.openCommand;
+    UnitCommand.Quick.openCommand = function () {
+        alias020.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_QUICK);
+    };
+
+    // 場所イベント(カスタム)
+    var alias021 = UnitCommand.PlaceCommand.openCommand;
+    UnitCommand.PlaceCommand.openCommand = function () {
+        alias021.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_PLACECOMMAND);
+        RewindTimeManager.setPlaceCommandName(this.getCommandName());
+    };
+
+    // 会話
+    var alias022 = UnitCommand.Talk.openCommand;
+    UnitCommand.Talk.openCommand = function () {
+        alias022.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_TALK);
+        RewindTimeManager.setTalkCommandName(this.getCommandName());
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -3471,9 +3632,9 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップコマンドを追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias0000 = MapCommand.configureCommands;
+    var alias023 = MapCommand.configureCommands;
     MapCommand.configureCommands = function (groupArray) {
-        alias0000.call(this, groupArray);
+        alias023.call(this, groupArray);
 
         groupArray.insertObject(MapCommand.RewindTime, REWIND_COMMAND_INDEX);
     };
@@ -3691,9 +3852,9 @@ var GetNumberTokenStateType = {
         return screenParam;
     };
 
-    var alias015 = GameOverChecker.isGameOver;
+    var alias024 = GameOverChecker.isGameOver;
     GameOverChecker.isGameOver = function () {
-        var isGameOver = alias015.call(this);
+        var isGameOver = alias024.call(this);
         var switchTable = root.getMetaSession().getGlobalSwitchTable();
         var index = switchTable.getSwitchIndexFromId(IS_GAME_OVER_SWITCH_ID);
 
@@ -3927,9 +4088,11 @@ var GetNumberTokenStateType = {
             }
 
             if (result === RewindSelectResult.SELECT) {
+                this._rewindQuestionWindow.setQuestionActive(true);
                 this.changeCycleMode(RewindTimeMode.REWINDQUESTION);
             } else if (result === RewindSelectResult.CANCEL) {
                 if (this._isGameOverRewind) {
+                    this._cancelQuestionWindow.setQuestionActive(true);
                     this.changeCycleMode(RewindTimeMode.CANCELQUESTION);
                 } else {
                     RewindTimeManager.rewindLatest(true);
