@@ -20,7 +20,7 @@
 
 【使い方】
 下記のURLからマニュアルを参照してください。
-https://github.com/sangoopan/srpg-studio-plugin/tree/master/RewindTimeSystem#readme
+https://github.com/CordialBun/srpg-studio-plugin/tree/master/RewindTimeSystem#readme
 
 
 【作者】
@@ -42,6 +42,7 @@ Ver.1.1  2024/5/20  古いバージョンのSRPG Studioを使用していると�
                     乱数取得をroot.getRandomNumber()で行っていた箇所をProbability.getRandomNumber()に変更。
 Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
+Ver.1.30 2024/11/03  相対ターンの巻き戻しに対応。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -402,6 +403,9 @@ var RewindTimeManager = {
                             break;
                         case "turnCount": // ターン数
                             this.rewindTurnCount(record[key], curSession);
+                            break;
+                        case "relativeTurnCount": // 相対ターン数
+                            this.rewindRelativeTurnCount(record[key], curSession);
                             break;
                         case "turnType": // フェイズ
                             this.rewindTurnType(record[key], curSession);
@@ -879,6 +883,10 @@ var RewindTimeManager = {
         curSession.setTurnCount(turnCount);
     },
 
+    rewindRelativeTurnCount: function (relativeTurnCount, curSession) {
+        curSession.setRelativeTurnCount(relativeTurnCount);
+    },
+
     rewindTurnType: function (turnType, curSession) {
         curSession.setTurnType(turnType);
     },
@@ -1101,6 +1109,7 @@ var RewindTimeManager = {
         this.createMapCursorRecord(record, newLatestRecord, latestRecord.mapCursorParam, isFirstRecord, curSession);
         this.createScrollPixelRecord(record, newLatestRecord, latestRecord.scrollPixelParam, isFirstRecord, curSession);
         this.createTurnCountRecord(record, newLatestRecord, latestRecord.turnCount, isFirstRecord, curSession);
+        this.createRelativeTurnCountRecord(record, newLatestRecord, latestRecord.relativeTurnCount, isFirstRecord, curSession);
         this.createTurnTypeRecord(record, newLatestRecord, latestRecord.turnType, isFirstRecord, curSession);
         this.createTrophyRecord(record, newLatestRecord, latestRecord.trophyParamArray, isFirstRecord, curSession);
         this.createMapChipRecord(record, newLatestRecord, latestRecord.mapChipHandleParamArray, isFirstRecord, false, curSession);
@@ -1975,6 +1984,17 @@ var RewindTimeManager = {
         }
 
         newLatestRecord.turnCount = newLatestTurnCount;
+    },
+
+    createRelativeTurnCountRecord: function (record, newLatestRecord, latestRelativeTurnCount, isFirstRecord, curSession) {
+        var relativeTurnCount = curSession.getRelativeTurnCount();
+        var newLatestRelativeTurnCount = relativeTurnCount;
+
+        if (isFirstRecord || relativeTurnCount !== latestRelativeTurnCount) {
+            record.relativeTurnCount = relativeTurnCount;
+        }
+
+        newLatestRecord.relativeTurnCount = newLatestRelativeTurnCount;
     },
 
     createTurnTypeRecord: function (record, newLatestRecord, latestTurnType, isFirstRecord, curSession) {
