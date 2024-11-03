@@ -44,6 +44,7 @@ Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
 Ver.1.30 2024/11/03 相対ターンの巻き戻しに対応。
                     場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
+                    データ設定での武器やアイテムの並び順がIDと一致していないとき、ストック等のアイテムの巻き戻しが正常に動作しない不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -807,9 +808,9 @@ var RewindTimeManager = {
             itemParam = stockItemParamArray[i];
 
             if (itemParam.isWeapon) {
-                baseItem = this._weaponList.getData(itemParam.itemId);
+                baseItem = this._weaponList.getDataFromId(itemParam.itemId);
             } else {
-                baseItem = this._itemList.getData(itemParam.itemId);
+                baseItem = this._itemList.getDataFromId(itemParam.itemId);
             }
 
             item = root.duplicateItem(baseItem);
@@ -925,9 +926,9 @@ var RewindTimeManager = {
             switch (trophyFlag) {
                 case TrophyFlag.ITEM:
                     if (trophyParam.isWeapon) {
-                        baseItem = this._weaponList.getData(trophyParam.itemId);
+                        baseItem = this._weaponList.getDataFromId(trophyParam.itemId);
                     } else {
-                        baseItem = this._itemList.getData(trophyParam.itemId);
+                        baseItem = this._itemList.getDataFromId(trophyParam.itemId);
                     }
 
                     item = root.duplicateItem(baseItem);
@@ -980,9 +981,9 @@ var RewindTimeManager = {
                 inventory = inventoryNumberArray[j];
 
                 if (itemParam.isWeapon) {
-                    baseItem = this._weaponList.getData(itemParam.itemId);
+                    baseItem = this._weaponList.getDataFromId(itemParam.itemId);
                 } else {
-                    baseItem = this._itemList.getData(itemParam.itemId);
+                    baseItem = this._itemList.getDataFromId(itemParam.itemId);
                 }
 
                 item = root.duplicateItem(baseItem);
@@ -1015,9 +1016,9 @@ var RewindTimeManager = {
                 inventory = inventoryNumberArray[j];
 
                 if (itemParam.isWeapon) {
-                    baseItem = this._weaponList.getData(itemParam.itemId);
+                    baseItem = this._weaponList.getDataFromId(itemParam.itemId);
                 } else {
-                    baseItem = this._itemList.getData(itemParam.itemId);
+                    baseItem = this._itemList.getDataFromId(itemParam.itemId);
                 }
 
                 item = root.duplicateItem(baseItem);
