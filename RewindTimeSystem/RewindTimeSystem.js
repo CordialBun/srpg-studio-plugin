@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「時戻しプラグイン」 Ver.1.21
+時戻しシステム Ver.1.30
 
 
 【概要】
@@ -27,7 +27,7 @@ https://github.com/CordialBun/srpg-studio-plugin/tree/master/RewindTimeSystem#re
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.294
+SRPG Studio version:1.303
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -42,11 +42,14 @@ Ver.1.1  2024/5/20  古いバージョンのSRPG Studioを使用していると�
                     乱数取得をroot.getRandomNumber()で行っていた箇所をProbability.getRandomNumber()に変更。
 Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
-Ver.1.30 2024/11/03 相対ターンの巻き戻しに対応。
+Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変更。
+                    相対ターンの巻き戻しに対応。
                     場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
                     データ設定での武器やアイテムの並び順がIDと一致していないとき、ストック等のアイテムの巻き戻しが正常に動作しない不具合を修正。
                     顔画像を「なし」に設定しているユニットの巻き戻しが正常に動作しない不具合を修正。
                     巻き戻し画面の確認ウィンドウに指カーソルが表示されない不具合を修正。
+                    ボーナスの巻き戻しが正常に動作しない不具合を修正。
+                    透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -364,10 +367,7 @@ var RewindTimeManager = {
                             this.rewindAllUnit(record[key]);
                             break;
                         case "mapChipHandleParamArray": // マップチップ
-                            this.rewindMapChip(record[key], false, curSession);
-                            break;
-                        case "layerMapChipHandleParamArray": // マップチップ(透過レイヤー)
-                            this.rewindMapChip(record[key], true, curSession);
+                            this.rewindMapChip(record, curSession);
                             break;
                         case "mapCursorParam": // マップカーソル
                             this.rewindMapCursor(record[key], curSession);
@@ -770,11 +770,14 @@ var RewindTimeManager = {
         }
     },
 
-    rewindMapChip: function (handleParamArray, isLayer, curSession) {
+    rewindMapChip: function (record, curSession) {
         var i, mapX, mapY, isRuntime, resourceId, colorIndex, srcX, srcY, handle, handleParam;
+        var mapChipHandleParamArray = record.mapChipHandleParamArray;
+        var layerChipHandleParamArray = record.layerChipHandleParamArray;
 
-        for (i = 0; i < handleParamArray.length; i++) {
-            handleParam = handleParamArray[i];
+        for (i = 0; i < mapChipHandleParamArray.length; i++) {
+            // 非透過レイヤー
+            handleParam = mapChipHandleParamArray[i];
             mapX = handleParam.mx;
             mapY = handleParam.my;
             isRuntime = handleParam.is;
@@ -783,7 +786,19 @@ var RewindTimeManager = {
             srcX = handleParam.sx;
             srcY = handleParam.sy;
             handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
-            curSession.setMapChipGraphicsHandle(mapX, mapY, isLayer, handle);
+            curSession.setMapChipGraphicsHandle(mapX, mapY, false, handle);
+
+            // 透過レイヤー
+            handleParam = layerChipHandleParamArray[i];
+            mapX = handleParam.mx;
+            mapY = handleParam.my;
+            isRuntime = handleParam.is;
+            resourceId = handleParam.id;
+            colorIndex = handleParam.c;
+            srcX = handleParam.sx;
+            srcY = handleParam.sy;
+            handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
+            curSession.setMapChipGraphicsHandle(mapX, mapY, true, handle);
         }
     },
 
@@ -1118,6 +1133,8 @@ var RewindTimeManager = {
         var latestRecord = this._latestRecord;
         var metaSession = root.getMetaSession();
         var curSession = root.getCurrentSession();
+        var latestMapChipHandleParamArray = latestRecord.mapChipHandleParamArray;
+        var latestLayerChipHandleParamArray = latestRecord.layerChipHandleParamArray;
 
         this.createUnitRecord(record, newLatestRecord, latestRecord, isFirstRecord);
         this.createGoldRecord(record, newLatestRecord, latestRecord.gold, isFirstRecord, metaSession);
@@ -1140,8 +1157,7 @@ var RewindTimeManager = {
         this.createRelativeTurnCountRecord(record, newLatestRecord, latestRecord.relativeTurnCount, isFirstRecord, curSession);
         this.createTurnTypeRecord(record, newLatestRecord, latestRecord.turnType, isFirstRecord, curSession);
         this.createTrophyRecord(record, newLatestRecord, latestRecord.trophyParamArray, isFirstRecord, curSession);
-        this.createMapChipRecord(record, newLatestRecord, latestRecord.mapChipHandleParamArray, isFirstRecord, false, curSession);
-        this.createMapChipRecord(record, newLatestRecord, latestRecord.layerMapChipHandleParamArray, isFirstRecord, true, curSession);
+        this.createMapChipRecord(record, newLatestRecord, latestMapChipHandleParamArray, latestLayerChipHandleParamArray, isFirstRecord, curSession);
         this.createMusicRecord(record, newLatestRecord, latestRecord.musicHandleParam, isFirstRecord);
         this.createScreenEffectRecord(record, newLatestRecord, latestRecord.screenEffectParam, isFirstRecord);
         this.createSwitchRecord(record, newLatestRecord, latestRecord.localSwitchParamArray, isFirstRecord, false, curSession);
@@ -2084,62 +2100,106 @@ var RewindTimeManager = {
         newLatestRecord.trophyParamArray = newLatestTrophyParamArray;
     },
 
-    createMapChipRecord: function (record, newLatestRecord, latestHandleParamArray, isFirstRecord, isLayer, curSession) {
-        var x, y, key, handle, handleParam, latestHandleParam, newLatestHandleParam;
+    createMapChipRecord: function (
+        record,
+        newLatestRecord,
+        latestMapChipHandleParamArray,
+        latestLayerChipHandleParamArray,
+        isFirstRecord,
+        curSession
+    ) {
+        var x, y, handle, mapChipHandleParam, layerChipHandleParam, latestMapChipHandleParam, latestLayerChipHandleParam;
+        var newLatestMapChipHandleParam, newLatestLayerChipHandleParam;
         var mapData = curSession.getCurrentMapInfo();
         var mapWidth = mapData.getMapWidth();
         var mapHeight = mapData.getMapHeight();
-        var handleParamArray = [];
-        var newLatestHandleParamArray = [];
-
-        if (isLayer) {
-            key = "layerMapChipHandleParamArray";
-        } else {
-            key = "mapChipHandleParamArray";
-        }
+        var mapChipHandleParamArray = [];
+        var layerChipHandleParamArray = [];
+        var newLatestMapChipHandleParamArray = [];
+        var newLatestLayerChipHandleParamArray = [];
 
         for (y = 0; y < mapHeight; y++) {
-            newLatestHandleParamArray.push([]);
+            newLatestMapChipHandleParamArray.push([]);
+            newLatestLayerChipHandleParamArray.push([]);
 
             for (x = 0; x < mapWidth; x++) {
-                handle = curSession.getMapChipGraphicsHandle(x, y, isLayer);
-                handleParam = {};
-                newLatestHandleParam = {};
-                latestHandleParam = {};
+                // 非透過レイヤー
+                handle = curSession.getMapChipGraphicsHandle(x, y, false);
+                mapChipHandleParam = {};
+                newLatestMapChipHandleParam = {};
+                latestMapChipHandleParam = {};
 
-                handleParam.mx = x;
-                handleParam.my = y;
-                handleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
-                handleParam.id = handle.getResourceId();
-                handleParam.c = handle.getColorIndex();
-                handleParam.sx = handle.getSrcX();
-                handleParam.sy = handle.getSrcY();
-                newLatestHandleParam.mx = x;
-                newLatestHandleParam.my = y;
-                newLatestHandleParam.is = handleParam.is;
-                newLatestHandleParam.id = handleParam.id;
-                newLatestHandleParam.c = handleParam.c;
-                newLatestHandleParam.sx = handleParam.sx;
-                newLatestHandleParam.sy = handleParam.sy;
+                mapChipHandleParam.mx = x;
+                mapChipHandleParam.my = y;
+                mapChipHandleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
+                mapChipHandleParam.id = handle.getResourceId();
+                mapChipHandleParam.c = handle.getColorIndex();
+                mapChipHandleParam.sx = handle.getSrcX();
+                mapChipHandleParam.sy = handle.getSrcY();
+                newLatestMapChipHandleParam.mx = x;
+                newLatestMapChipHandleParam.my = y;
+                newLatestMapChipHandleParam.is = mapChipHandleParam.is;
+                newLatestMapChipHandleParam.id = mapChipHandleParam.id;
+                newLatestMapChipHandleParam.c = mapChipHandleParam.c;
+                newLatestMapChipHandleParam.sx = mapChipHandleParam.sx;
+                newLatestMapChipHandleParam.sy = mapChipHandleParam.sy;
 
-                if (latestHandleParamArray !== undefined) {
-                    latestHandleParam = latestHandleParamArray[y][x];
+                if (latestMapChipHandleParamArray !== undefined) {
+                    latestMapChipHandleParam = latestMapChipHandleParamArray[y][x];
                 }
 
-                if (!isFirstRecord && this.hasDiffProperties(handleParam, latestHandleParam)) {
-                    handleParamArray.push(handleParam);
-                    this.addBeforeChangedMapChip(latestHandleParam, isLayer);
+                // 透過レイヤー
+                handle = curSession.getMapChipGraphicsHandle(x, y, true);
+                layerChipHandleParam = {};
+                newLatestLayerChipHandleParam = {};
+                latestLayerChipHandleParam = {};
+
+                layerChipHandleParam.mx = x;
+                layerChipHandleParam.my = y;
+                layerChipHandleParam.is = handle.getHandleType() === ResourceHandleType.RUNTIME;
+                layerChipHandleParam.id = handle.getResourceId();
+                layerChipHandleParam.c = handle.getColorIndex();
+                layerChipHandleParam.sx = handle.getSrcX();
+                layerChipHandleParam.sy = handle.getSrcY();
+                newLatestLayerChipHandleParam.mx = x;
+                newLatestLayerChipHandleParam.my = y;
+                newLatestLayerChipHandleParam.is = layerChipHandleParam.is;
+                newLatestLayerChipHandleParam.id = layerChipHandleParam.id;
+                newLatestLayerChipHandleParam.c = layerChipHandleParam.c;
+                newLatestLayerChipHandleParam.sx = layerChipHandleParam.sx;
+                newLatestLayerChipHandleParam.sy = layerChipHandleParam.sy;
+
+                if (latestLayerChipHandleParamArray !== undefined) {
+                    latestLayerChipHandleParam = latestLayerChipHandleParamArray[y][x];
                 }
 
-                newLatestHandleParamArray[y].push(newLatestHandleParam);
+                // 透過レイヤーか非透過レイヤーのどちらかが変更されているならレコードに両方記録する
+                if (
+                    !isFirstRecord &&
+                    (this.hasDiffProperties(mapChipHandleParam, latestMapChipHandleParam) ||
+                        this.hasDiffProperties(layerChipHandleParam, latestLayerChipHandleParam))
+                ) {
+                    mapChipHandleParamArray.push(mapChipHandleParam);
+                    layerChipHandleParamArray.push(layerChipHandleParam);
+                    this.addBeforeChangedMapChip(latestMapChipHandleParam, false);
+                    this.addBeforeChangedMapChip(latestLayerChipHandleParam, true);
+                }
+
+                newLatestMapChipHandleParamArray[y].push(newLatestMapChipHandleParam);
+                newLatestLayerChipHandleParamArray[y].push(newLatestLayerChipHandleParam);
             }
         }
 
-        if (handleParamArray.length > 0) {
-            record[key] = handleParamArray;
+        if (mapChipHandleParamArray.length > 0) {
+            record.mapChipHandleParamArray = mapChipHandleParamArray;
         }
 
-        newLatestRecord[key] = newLatestHandleParamArray;
+        if (layerChipHandleParamArray.length > 0) {
+            record.layerChipHandleParamArray = layerChipHandleParamArray;
+        }
+
+        newLatestRecord.mapChipHandleParamArray = newLatestMapChipHandleParamArray;
+        newLatestRecord.layerChipHandleParamArray = newLatestLayerChipHandleParamArray;
     },
 
     createMusicRecord: function (record, newLatestRecord, latestMusicHandleParam, isFirstRecord) {
