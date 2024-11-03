@@ -45,6 +45,7 @@ Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が
 Ver.1.30 2024/11/03 相対ターンの巻き戻しに対応。
                     場所・会話イベントと行動回復コマンドに対応する文字列を設定できる機能を追加。
                     データ設定での武器やアイテムの並び順がIDと一致していないとき、ストック等のアイテムの巻き戻しが正常に動作しない不具合を修正。
+                    顔画像を「なし」に設定しているユニットの巻き戻しが正常に動作しない不具合を修正
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -597,13 +598,19 @@ var RewindTimeManager = {
     },
 
     rewindFace: function (unit, faceParam) {
+        var handle;
         var isRuntime = faceParam.handleType;
+        var isNullHandle = faceParam.isNullHandle;
         var id = faceParam.resourceId;
         var srcX = faceParam.srcX;
         var srcY = faceParam.srcY;
-        var handle = root.createResourceHandle(isRuntime, id, 0, srcX, srcY);
 
-        unit.setFaceResourceHandle(handle);
+        if (isNullHandle) {
+            unit.setFaceResourceHandle(root.createEmptyHandle());
+        } else {
+            handle = root.createResourceHandle(isRuntime, id, 0, srcX, srcY);
+            unit.setFaceResourceHandle(handle);
+        }
     },
 
     rewindParamValue: function (unit, valueArray) {
@@ -1241,10 +1248,12 @@ var RewindTimeManager = {
         var handle = unit.getFaceResourceHandle();
 
         faceParam.handleType = handle.getHandleType();
+        faceParam.isNullHandle = handle.isNullHandle();
         faceParam.resourceId = handle.getResourceId();
         faceParam.srcX = handle.getSrcX();
         faceParam.srcY = handle.getSrcY();
         newLatestFaceParam.handleType = faceParam.handleType;
+        newLatestFaceParam.isNullHandle = faceParam.isNullHandle;
         newLatestFaceParam.resourceId = faceParam.resourceId;
         newLatestFaceParam.srcX = faceParam.srcX;
         newLatestFaceParam.srcY = faceParam.srcY;
