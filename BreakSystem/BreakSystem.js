@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-ブレイクシステム Ver.1.00
+ブレイクシステム＆ブレイク無効スキル Ver.1.00
 
 
 【概要】
@@ -17,14 +17,19 @@
 3.自動解除条件を「戦闘に入った」「1回目で解除」に設定する。
 4.その他の項目はデフォルトのままにしておく。
 
-ステートの設定完了後、本プラグインの46行目の数値を上記のステートのIDに変更してください。
+ステートの設定完了後、本プラグインの52行目の数値を上記のステートのIDに変更してください。
+
+
+【ブレイク無効スキル】
+ボスユニットや特定の兵種など、ブレイク状態にさせたくないユニットがいる場合は、
+カスタムスキルを作成してキーワードに resistBreak を設定することでブレイク状態を無効にするスキルを実装できます。
 
 
 【作者】
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.302
+SRPG Studio version:1.303
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -34,7 +39,8 @@ SRPG Studio version:1.302
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.0  2024/10/29  初版
+Ver.1.00  2024/10/29  初版
+Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装できる機能を追加。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -67,8 +73,9 @@ Ver.1.0  2024/10/29  初版
         var weapon = virtualActive.weapon;
         var isPreemptive = virtualActive.isPreemptive;
         var compatible = CompatibleCalculator._getCompatible(active, passive, weapon);
+        var skill = SkillControl.getPossessionCustomSkill(passive, "resistBreak");
 
-        if (isPreemptive && compatible !== null) {
+        if (isPreemptive && compatible !== null && skill === null) {
             state = root.getBaseData().getStateList().getDataFromId(BREAK_STATE_ID);
             attackEntry.stateArrayPassive.push(state);
             virtualPassive.stateArray.push(state);
