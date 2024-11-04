@@ -1302,11 +1302,11 @@ var WaitTurnOrderManager = {
             targetUnit = this.getMapPartsTarget();
 
             if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                x += WaitTurnOrderParam.RIGHT_ORDER_LIST_START_POS_X;
+                x += 0;
                 y += WaitTurnOrderParam.RIGHT_ORDER_LIST_START_POS_Y;
             } else {
                 x += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_X;
-                y += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_Y;
+                y += 0;
             }
 
             count = Math.min(predictOrderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
@@ -1319,7 +1319,7 @@ var WaitTurnOrderManager = {
                         cursorPic.drawParts(x, y, 0, 0, 32, 32);
                     } else {
                         cursorPic.setDegree(90);
-                        cursorPic.drawParts(x - 3, y - 10, 0, 0, 32, 32);
+                        cursorPic.drawParts(x - 3, y, 0, 0, 32, 32);
                     }
                 }
 
@@ -1646,7 +1646,11 @@ var WaitTurnOrderManager = {
         var d = root.getGameAreaHeight() / 2;
         var yBase = LayoutControl.getRelativeY(10) - 28;
         var yMin = yBase;
-        var yMax = root.getGameAreaHeight() - this._getWindowHeight() - yBase - GraphicsFormat.MAPCHIP_HEIGHT * 2;
+        var yMax = root.getGameAreaHeight() - this._getWindowHeight() - yBase;
+
+        if (!IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+            yMax -= GraphicsFormat.MAPCHIP_HEIGHT * 2;
+        }
 
         return y > d ? yMin : yMax;
     };
