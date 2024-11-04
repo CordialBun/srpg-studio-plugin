@@ -253,7 +253,7 @@ var WaitTurnOrderManager = {
                 this.initUnitParam(unit);
             }
 
-            if (unit.custom.curWT != null && typeof unit.custom.curWT === "number") {
+            if (typeof unit.custom.curWT === "number") {
                 allUnitList.push(unit);
             }
         }
@@ -266,7 +266,7 @@ var WaitTurnOrderManager = {
                 this.initUnitParam(unit);
             }
 
-            if (unit.custom.curWT != null && typeof unit.custom.curWT === "number") {
+            if (typeof unit.custom.curWT === "number") {
                 allUnitList.push(unit);
             }
         }
@@ -279,7 +279,7 @@ var WaitTurnOrderManager = {
                 this.initUnitParam(unit);
             }
 
-            if (unit.custom.curWT != null && typeof unit.custom.curWT === "number") {
+            if (typeof unit.custom.curWT === "number") {
                 allUnitList.push(unit);
             }
         }
@@ -369,7 +369,7 @@ var WaitTurnOrderManager = {
         var predictOrderList = [];
         var pushCount = 0;
 
-        if (atUnit == null || atUnit.custom.curWT == null || typeof atUnit.custom.curWT !== "number") {
+        if (atUnit == null || typeof atUnit.custom.curWT !== "number") {
             return null;
         }
 
@@ -482,7 +482,7 @@ var WaitTurnOrderManager = {
 
         unitClass = unit.getClass();
 
-        if (unitClass.custom.classWT == null || typeof unitClass.custom.classWT !== "number" || unitClass.custom.classWT < 0) {
+        if (typeof unitClass.custom.classWT !== "number" || unitClass.custom.classWT < 0) {
             classWT = 0;
         } else {
             classWT = unitClass.custom.classWT;
@@ -517,19 +517,19 @@ var WaitTurnOrderManager = {
         willAction = unit.custom.willAction;
         hasTradedItem = unit.custom.hasTradedItem;
 
-        if (isPredicting == null || typeof isPredicting !== "boolean" || !isPredicting) {
+        if (typeof isPredicting !== "boolean" || !isPredicting) {
             return defaultWT;
         }
 
-        if (firstMove == null || typeof firstMove !== "number") {
+        if (typeof firstMove !== "number") {
             firstMove = 0;
         }
 
-        if (willAction == null || typeof willAction !== "boolean") {
+        if (typeof willAction !== "boolean") {
             willAction = false;
         }
 
-        if (hasTradedItem == null || typeof hasTradedItem !== "boolean") {
+        if (typeof hasTradedItem !== "boolean") {
             hasTradedItem = false;
         }
 
@@ -561,7 +561,7 @@ var WaitTurnOrderManager = {
                 continue;
             }
 
-            if (unit.custom.atCount != null && typeof unit.custom.atCount === "number") {
+            if (typeof unit.custom.atCount === "number") {
                 return unit.custom.atCount;
             }
         }
@@ -574,7 +574,7 @@ var WaitTurnOrderManager = {
                 continue;
             }
 
-            if (unit.custom.atCount != null && typeof unit.custom.atCount === "number") {
+            if (typeof unit.custom.atCount === "number") {
                 return unit.custom.atCount;
             }
         }
@@ -587,7 +587,7 @@ var WaitTurnOrderManager = {
                 continue;
             }
 
-            if (unit.custom.atCount != null && typeof unit.custom.atCount === "number") {
+            if (typeof unit.custom.atCount === "number") {
                 return unit.custom.atCount;
             }
         }
@@ -599,7 +599,7 @@ var WaitTurnOrderManager = {
     getMapTotalWT: function () {
         var curMapInfo = root.getCurrentSession().getCurrentMapInfo();
 
-        if (curMapInfo == null || curMapInfo.custom.totalWT == null || typeof curMapInfo.custom.totalWT !== "number") {
+        if (curMapInfo == null || typeof curMapInfo.custom.totalWT !== "number") {
             return null;
         }
 
@@ -762,7 +762,7 @@ var WaitTurnOrderManager = {
         for (i = 0; i < count; i++) {
             unit = list.getData(i);
 
-            if (unit.custom.isAT != null && typeof unit.custom.isAT === "boolean" && unit.custom.isAT) {
+            if (typeof unit.custom.isAT === "boolean" && unit.custom.isAT) {
                 arr.push(unit);
                 break;
             }
@@ -821,7 +821,7 @@ var WaitTurnOrderManager = {
             if (this._targetUnit !== null) {
                 isAT = this._targetUnit.custom.isAT;
 
-                if (isAT != null && typeof isAT === "boolean" && isAT) {
+                if (typeof isAT === "boolean" && isAT) {
                     // ユニットの移動範囲を表示するモードに進む
                     this._mapSequenceArea.openSequence(this);
                     this.changeCycleMode(PlayerTurnMode.AREA);
@@ -900,7 +900,7 @@ var WaitTurnOrderManager = {
         for (i = 0; i < count; i++) {
             unit = list.getData(i);
 
-            if (unit.custom.isAT != null && typeof unit.custom.isAT === "boolean" && unit.custom.isAT) {
+            if (typeof unit.custom.isAT === "boolean" && unit.custom.isAT) {
                 arr.push(unit);
                 break;
             }
@@ -945,7 +945,7 @@ var WaitTurnOrderManager = {
         unit.custom.isPredicting = true;
         unit.custom.firstMove = unit.getMostResentMov();
 
-        if (obj.isWaitCommand != null && typeof obj.isWaitCommand === "boolean" && obj.isWaitCommand) {
+        if (typeof obj.isWaitCommand === "boolean" && obj.isWaitCommand) {
             unit.custom.willAction = false;
         } else {
             unit.custom.willAction = true;
@@ -1158,7 +1158,7 @@ var WaitTurnOrderManager = {
                 // ユニットコマンド選択中はMapParts.OrderCursorによる強調表示がなくなるので
                 // こっちで処理する
                 isPredicting = atUnit.custom.isPredicting;
-                if (isPredicting == null || typeof isPredicting !== "boolean" || isPredicting) {
+                if (typeof isPredicting !== "boolean" || isPredicting) {
                     if (unit.getId() === atUnit.getId() && i > 0) {
                         cursorPic.drawParts(x, y, 0, 0, 32, 32);
                     }
@@ -1311,7 +1311,7 @@ var WaitTurnOrderManager = {
     UnitSimpleRenderer._drawWT = function (x, y, unit, textui) {
         var curWT, defaultWT;
 
-        if (unit == null || unit.custom.curWT == null || typeof unit.custom.curWT !== "number") {
+        if (unit == null || typeof unit.custom.curWT !== "number") {
             return;
         }
 
@@ -1352,12 +1352,7 @@ var WaitTurnOrderManager = {
             unit = list.getData(i);
 
             // そのユニットが画面内にいるときのみ描画する
-            if (
-                this._isMapInside(unit) == true &&
-                unit.custom.orderNum != null &&
-                typeof unit.custom.orderNum === "number" &&
-                unit.custom.orderNum > 0
-            ) {
+            if (this._isMapInside(unit) == true && typeof unit.custom.orderNum === "number" && unit.custom.orderNum > 0) {
                 orderNum = unit.custom.orderNum;
                 x = LayoutControl.getPixelX(unit.getMapX());
                 y = LayoutControl.getPixelY(unit.getMapY());
@@ -1372,12 +1367,7 @@ var WaitTurnOrderManager = {
             unit = list.getData(i);
 
             // そのユニットが画面内にいるときのみ描画する
-            if (
-                this._isMapInside(unit) == true &&
-                unit.custom.orderNum != null &&
-                typeof unit.custom.orderNum === "number" &&
-                unit.custom.orderNum > 0
-            ) {
+            if (this._isMapInside(unit) == true && typeof unit.custom.orderNum === "number" && unit.custom.orderNum > 0) {
                 orderNum = unit.custom.orderNum;
                 x = LayoutControl.getPixelX(unit.getMapX());
                 y = LayoutControl.getPixelY(unit.getMapY());
@@ -1392,12 +1382,7 @@ var WaitTurnOrderManager = {
             unit = list.getData(i);
 
             // そのユニットが画面内にいるときのみ描画する
-            if (
-                this._isMapInside(unit) == true &&
-                unit.custom.orderNum != null &&
-                typeof unit.custom.orderNum === "number" &&
-                unit.custom.orderNum > 0
-            ) {
+            if (this._isMapInside(unit) == true && typeof unit.custom.orderNum === "number" && unit.custom.orderNum > 0) {
                 orderNum = unit.custom.orderNum;
                 x = LayoutControl.getPixelX(unit.getMapX());
                 y = LayoutControl.getPixelY(unit.getMapY());
@@ -1586,11 +1571,7 @@ var WaitTurnOrderManager = {
         var x = xBase + 80;
         var y = yBase + 25;
 
-        if (
-            (sceneType === SceneType.FREE || sceneType === SceneType.BATTLESETUP) &&
-            object.custom.mapTotalWT != null &&
-            typeof object.custom.mapTotalWT === "number"
-        ) {
+        if ((sceneType === SceneType.FREE || sceneType === SceneType.BATTLESETUP) && typeof object.custom.mapTotalWT === "number") {
             totalWT = object.custom.mapTotalWT;
             TextRenderer.drawKeywordText(x, y, text, -1, ColorValue.INFO, font);
             width = TextRenderer.getTextWidth(text, font) + 30;
