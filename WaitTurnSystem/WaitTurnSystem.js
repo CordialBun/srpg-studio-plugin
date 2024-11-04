@@ -411,7 +411,6 @@ var WaitTurnOrderManager = {
             }
         }
 
-        root.log("length:" + orderTopList.length);
         return orderTopList;
     },
 
@@ -1126,15 +1125,22 @@ var WaitTurnOrderManager = {
     *----------------------------------------------------------------------------------------------------------------*/
     var graphicsManager = null;
     var cursorPic = null;
+    var iconPic = null;
 
     var alias000 = SetupControl.setup;
     SetupControl.setup = function () {
         alias000.call(this);
+        var baseList;
+
         if (graphicsManager == null) {
             graphicsManager = root.getGraphicsManager();
         }
         if (cursorPic == null) {
             cursorPic = root.queryUI("command_poschangecursor");
+        }
+        if (iconPic == null) {
+            baseList = root.getBaseData().getGraphicsResourceList(GraphicsType.ICON, true);
+            iconPic = baseList.getCollectionData(1, 0);
         }
     };
 
@@ -1182,7 +1188,7 @@ var WaitTurnOrderManager = {
                 unit = obj.unit;
 
                 if (i === 0) {
-                    TextRenderer.drawText(x - 6, y + 11, StringTable.Signal_AT, -1, ColorValue.KEYWORD, font);
+                    iconPic.drawParts(x - 10, y + 5, 0, 24 * 3, 24, 24);
                 } else {
                     NumberRenderer.drawNumber(x, y + 4, i + 1);
                 }
@@ -1473,10 +1479,11 @@ var WaitTurnOrderManager = {
             return;
         }
 
-        x += 0;
-        y -= 4;
-
-        NumberRenderer.drawRightNumber(x, y, orderNum);
+        if (orderNum === 1) {
+            iconPic.drawStretchParts(x - 4, y - 4, 20, 20, 0, 24 * 3, 24, 24);
+        } else {
+            NumberRenderer.drawRightNumber(x, y - 4, orderNum);
+        }
     };
 
     MapLayer._isMapInside = function (unit) {
@@ -1575,10 +1582,8 @@ var WaitTurnOrderManager = {
         for (i = count - 1; i >= 0; i--) {
             obj = groupArray[i];
             if (obj.getConfigItemTitle() === StringTable.Config_AutoTurnEnd) {
-                root.log("AutoTurnEnd");
                 groupArray.splice(i, 1);
             } else if (obj.getConfigItemTitle() === StringTable.Config_AutoTurnSkip) {
-                root.log("AutoTurnSkip");
                 groupArray.splice(i, 1);
             }
         }
