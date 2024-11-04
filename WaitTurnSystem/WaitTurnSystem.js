@@ -1507,36 +1507,22 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
+    var alias006 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        groupArray.appendObject(ConfigItem.MusicPlay);
-        groupArray.appendObject(ConfigItem.SoundEffect);
-        if (DataConfig.getVoiceCategoryName() !== "") {
-            groupArray.appendObject(ConfigItem.Voice);
-        }
-        if (DataConfig.isMotionGraphicsEnabled()) {
-            groupArray.appendObject(ConfigItem.RealBattle);
-            if (DataConfig.isHighResolution()) {
-                groupArray.appendObject(ConfigItem.RealBattleScaling);
+        alias006.call(this, groupArray);
+        var i, obj;
+        var count = groupArray.length;
+
+        for (i = count - 1; i >= 0; i--) {
+            obj = groupArray[i];
+            if (obj.getConfigItemTitle() === StringTable.Config_AutoTurnEnd) {
+                root.log("AutoTurnEnd");
+                groupArray.splice(i, 1);
+            } else if (obj.getConfigItemTitle() === StringTable.Config_AutoTurnSkip) {
+                root.log("AutoTurnSkip");
+                groupArray.splice(i, 1);
             }
         }
-        groupArray.appendObject(ConfigItem.AutoCursor);
-        // groupArray.appendObject(ConfigItem.AutoTurnEnd);
-        // groupArray.appendObject(ConfigItem.AutoTurnSkip);
-        groupArray.appendObject(ConfigItem.EnemyMarking);
-        groupArray.appendObject(ConfigItem.MapGrid);
-        groupArray.appendObject(ConfigItem.UnitSpeed);
-        groupArray.appendObject(ConfigItem.MessageSpeed);
-        groupArray.appendObject(ConfigItem.ScrollSpeed);
-        groupArray.appendObject(ConfigItem.UnitMenuStatus);
-        groupArray.appendObject(ConfigItem.MapUnitHpVisible);
-        groupArray.appendObject(ConfigItem.MapUnitSymbol);
-        groupArray.appendObject(ConfigItem.DamagePopup);
-        if (this._isVisible(CommandLayoutType.MAPCOMMAND, CommandActionType.LOAD)) {
-            groupArray.appendObject(ConfigItem.LoadCommand);
-        }
-        groupArray.appendObject(ConfigItem.SkipControl);
-        groupArray.appendObject(ConfigItem.MouseOperation);
-        groupArray.appendObject(ConfigItem.MouseCursorTracking);
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
