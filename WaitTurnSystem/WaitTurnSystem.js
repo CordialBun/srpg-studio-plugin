@@ -322,7 +322,7 @@ var WaitTurnOrderManager = {
                 unit.custom.isAT = false;
             }
 
-            defaultWT = this.calcDefaultWT(unit);
+            defaultWT = this.calcUnitWT(unit);
 
             for (j = 0; j < WaitTurnOrderParam.ORDER_LIST_UNIT_NUM; j++) {
                 this._orderList.push({
@@ -398,7 +398,7 @@ var WaitTurnOrderManager = {
                 isTop: i === 0
             });
 
-            sumWT += i === 0 ? this.calcNextWT(atUnit) : this.calcDefaultWT(atUnit);
+            sumWT += this.calcUnitWT(atUnit);
         }
 
         predictOrderList = predictOrderList.sort(function (prevObj, nextObj) {
@@ -451,7 +451,7 @@ var WaitTurnOrderManager = {
             return;
         }
 
-        unit.custom.curWT = this.calcNextWT(unit);
+        unit.custom.curWT = this.calcUnitWT(unit);
     },
 
     // ユニットのカスパラを初期化する
@@ -460,19 +460,15 @@ var WaitTurnOrderManager = {
             return;
         }
 
-        unit.custom.curWT = this.calcDefaultWT(unit);
+        unit.custom.curWT = this.calcUnitWT(unit);
         unit.custom.orderNum = 0;
         unit.custom.isAT = false;
         unit.custom.atCount = 0;
         unit.custom.isPredicting = false;
-        unit.custom.firstMove = 0;
-        unit.custom.secondMove = 0;
-        unit.custom.willAction = false;
-        unit.custom.hasTradedItem = false;
     },
 
     // ユニットの基本WT値を計算する
-    calcDefaultWT: function (unit) {
+    calcUnitWT: function (unit) {
         var unitClass, classWT, defaultWT, spd, i, count, item, weight;
         var totalWeight = 0;
 
@@ -500,49 +496,6 @@ var WaitTurnOrderManager = {
         defaultWT = classWT - spd + totalWeight;
 
         return defaultWT;
-    },
-
-    // 次に加算されるWT値を計算する
-    calcNextWT: function (unit) {
-        var defaultWT, isPredicting, firstMove, secondMove, willAction, hasTradedItem, hasMoved, hasActioned;
-
-        if (unit === null) {
-            return 0;
-        }
-
-        defaultWT = this.calcDefaultWT(unit);
-        isPredicting = unit.custom.isPredicting;
-        firstMove = unit.custom.firstMove;
-        secondMove = unit.custom.secondMove;
-        willAction = unit.custom.willAction;
-        hasTradedItem = unit.custom.hasTradedItem;
-
-        if (typeof isPredicting !== "boolean" || !isPredicting) {
-            return defaultWT;
-        }
-
-        if (typeof firstMove !== "number") {
-            firstMove = 0;
-        }
-
-        if (typeof willAction !== "boolean") {
-            willAction = false;
-        }
-
-        if (typeof hasTradedItem !== "boolean") {
-            hasTradedItem = false;
-        }
-
-        hasMoved = firstMove > 0 || secondMove > 0;
-        hasActioned = willAction || hasTradedItem;
-
-        if (hasMoved && hasActioned) {
-            return defaultWT;
-        } else if (hasMoved || hasActioned) {
-            return Math.floor((defaultWT * 3) / 4);
-        } else {
-            return Math.floor(defaultWT / 2);
-        }
     },
 
     // 指定したIDのユニットのatCountを取得する
@@ -624,10 +577,6 @@ var WaitTurnOrderManager = {
         }
 
         unit.custom.isPredicting = false;
-        unit.custom.firstMove = 0;
-        unit.custom.secondMove = 0;
-        unit.custom.willAction = false;
-        unit.custom.hasTradedItem = false;
     }
 };
 
@@ -940,27 +889,13 @@ var WaitTurnOrderManager = {
     *----------------------------------------------------------------------------------------------------------------*/
     UnitCommand._drawTitle = function () {
         var unit = this.getListCommandUnit();
-        var obj = this._commandScrollbar.getObject();
-
-        unit.custom.isPredicting = true;
-        unit.custom.firstMove = unit.getMostResentMov();
-
-        if (typeof obj.isWaitCommand === "boolean" && obj.isWaitCommand) {
-            unit.custom.willAction = false;
-        } else {
-            unit.custom.willAction = true;
-        }
-
         var x = this.getPositionX();
         var y = this.getPositionY();
 
+        unit.custom.isPredicting = true;
+
         this._commandScrollbar.drawScrollbar(x, y);
     };
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        待機コマンドであることを確認するためのパラメータを追加する
-    *----------------------------------------------------------------------------------------------------------------*/
-    UnitCommand.Wait.isWaitCommand = true;
 
     /*-----------------------------------------------------------------------------------------------------------------
         アイテム交換後に待機を選択した場合にも行動したと判定できるようにする
@@ -969,10 +904,6 @@ var WaitTurnOrderManager = {
         var scene = root.getCurrentScene();
         var mhp = ParamBonus.getMhp(unit);
         var atUnit = WaitTurnOrderManager.getATUnit();
-
-        if (scene === SceneType.FREE && atUnit != null && unit.getId() === atUnit.getId()) {
-            unit.custom.hasTradedItem = true;
-        }
 
         // シーンがFREEでもEVENTでもない場合は、常にHPは最大HPと一致する。
         // この処理を忘れた場合は、アイテム交換やアイテム増減でHPが変化する。
@@ -989,55 +920,15 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        再移動での移動距離をチェックする
-    *----------------------------------------------------------------------------------------------------------------*/
-    RepeatMoveFlowEntry.moveFlowEntry = function () {
-        var unit;
-        var result = this._mapSequenceArea.moveSequence();
-
-        if (result === MapSequenceAreaResult.COMPLETE) {
-            unit = this._playerTurn.getTurnTargetUnit();
-            unit.custom.secondMove = unit.getMostResentMov();
-
-            return MoveResult.END;
-        } else if (result === MapSequenceAreaResult.CANCEL) {
-            return MoveResult.END;
-        }
-
-        return MoveResult.CONTINUE;
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
         自軍以外のユニットの移動と行動のチェックをする
     *----------------------------------------------------------------------------------------------------------------*/
-    var AutoActionType = {
-        MOVE: 0,
-        ACTION: 1,
-        WAIT: 2,
-        SCROLL: 3
-    };
-
-    WeaponAutoAction.autoActionType = AutoActionType.ACTION;
-    ItemAutoAction.autoActionType = AutoActionType.ACTION;
-    SkillAutoAction.autoActionType = AutoActionType.ACTION;
-    MoveAutoAction.autoActionType = AutoActionType.MOVE;
-    WaitAutoAction.autoActionType = AutoActionType.WAIT;
-    ScrollAutoAction.autoActionType = AutoActionType.SCROLL;
-
     EnemyTurn._moveAutoAction = function () {
-        var unit, autoActionType;
+        var unit;
 
         // this._autoActionIndexで識別されている行動を終えたか調べる
         if (this._autoActionArray[this._autoActionIndex].moveAutoAction() !== MoveResult.CONTINUE) {
             unit = this.getOrderUnit();
             unit.custom.isPredicting = true;
-            autoActionType = this._autoActionArray[this._autoActionIndex].autoActionType;
-
-            if (autoActionType === AutoActionType.MOVE) {
-                unit.custom.firstMove = unit.getMostResentMov();
-            } else if (autoActionType === AutoActionType.ACTION) {
-                unit.custom.willAction = true;
-            }
 
             if (!this._countAutoActionIndex()) {
                 this._changeIdleMode(EnemyTurnMode.TOP, this._getIdleValue());
@@ -1309,14 +1200,14 @@ var WaitTurnOrderManager = {
     };
 
     UnitSimpleRenderer._drawWT = function (x, y, unit, textui) {
-        var curWT, defaultWT;
+        var curWT, unitWT;
 
         if (unit == null || typeof unit.custom.curWT !== "number") {
             return;
         }
 
         curWT = unit.custom.curWT;
-        defaultWT = WaitTurnOrderManager.calcDefaultWT(unit);
+        unitWT = WaitTurnOrderManager.calcUnitWT(unit);
 
         x += GraphicsFormat.FACE_WIDTH + this._getInterval();
         y += 73;
@@ -1324,7 +1215,7 @@ var WaitTurnOrderManager = {
         TextRenderer.drawSignText(x, y, "WT");
         NumberRenderer.drawNumber(x + 44, y - 1, curWT);
         TextRenderer.drawSignText(x + 60, y, "/");
-        NumberRenderer.drawNumber(x + 98, y - 1, defaultWT);
+        NumberRenderer.drawNumber(x + 98, y - 1, unitWT);
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
