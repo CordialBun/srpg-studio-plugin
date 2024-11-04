@@ -803,10 +803,15 @@ var WaitTurnOrderManager = {
 
     TurnChangeStart.doLastAction = function () {
         var turnType = root.getCurrentSession().getTurnType();
+        var curMapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
+        var isWaitSelected = typeof curMapCustom.isWaitSelected === "boolean" ? curMapCustom.isWaitSelected : false;
 
-        if (turnType === TurnType.PLAYER) {
+        // 直前に待機コマンドが選択されているときに効果音が二重に再生されるのを防ぐ
+        if (turnType === TurnType.PLAYER && !isWaitSelected) {
             MediaControl.soundDirect("commandselect");
         }
+
+        curMapCustom.isWaitSelected = false;
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -936,14 +941,24 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        ユニットコマンド選択中に移動距離とカーソル位置(待機かそれ以外か)をチェックする
+        ユニットコマンド選択中に行動順予測のフラグを立てる
     *----------------------------------------------------------------------------------------------------------------*/
+    UnitCommand.Wait.isWaitCommand = true;
+
     UnitCommand._drawTitle = function () {
         var unit = this.getListCommandUnit();
+        var obj = this._commandScrollbar.getObject();
+        var curMapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
         var x = this.getPositionX();
         var y = this.getPositionY();
 
         unit.custom.isPredicting = true;
+
+        if (typeof obj.isWaitCommand === "boolean" && obj.isWaitCommand) {
+            curMapCustom.isWaitSelected = true;
+        } else {
+            curMapCustom.isWaitSelected = false;
+        }
 
         this._commandScrollbar.drawScrollbar(x, y);
     };
