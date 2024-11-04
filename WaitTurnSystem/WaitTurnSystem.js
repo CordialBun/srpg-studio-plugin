@@ -298,6 +298,18 @@ var WaitTurnOrderManager = {
                 return -1;
             } else if (prevUnit.custom.curWT > nextUnit.custom.curWT) {
                 return 1;
+            } else {
+                if (prevObj.unit.getUnitType() < nextObj.unit.getUnitType()) {
+                    return -1;
+                } else if (prevObj.unit.getUnitType() > nextObj.unit.getUnitType()) {
+                    return 1;
+                } else {
+                    if (prevObj.unit.getId() < nextObj.unit.getId()) {
+                        return -1;
+                    } else if (prevObj.unit.getId() > nextObj.unit.getId()) {
+                        return 1;
+                    }
+                }
             }
             return 0;
         });
@@ -347,6 +359,18 @@ var WaitTurnOrderManager = {
                 return -1;
             } else if (prevObj.wt > nextObj.wt) {
                 return 1;
+            } else {
+                if (prevObj.unit.getUnitType() < nextObj.unit.getUnitType()) {
+                    return -1;
+                } else if (prevObj.unit.getUnitType() > nextObj.unit.getUnitType()) {
+                    return 1;
+                } else {
+                    if (prevObj.unit.getId() < nextObj.unit.getId()) {
+                        return -1;
+                    } else if (prevObj.unit.getId() > nextObj.unit.getId()) {
+                        return 1;
+                    }
+                }
             }
             return 0;
         });
@@ -370,6 +394,25 @@ var WaitTurnOrderManager = {
     // 行動順リストを取得する
     getOrderList: function () {
         return this._orderList;
+    },
+
+    // isTopがtrueのオブジェクトのみを含む行動順リストを取得する
+    getOrderTopList: function () {
+        var i, obj;
+        var orderList = this.getOrderList();
+        var orderTopList = [];
+        var count = orderList.length;
+
+        for (i = 0; i < count; i++) {
+            obj = orderList[i];
+
+            if (obj.isTop) {
+                orderTopList.push(obj);
+            }
+        }
+
+        root.log("length:" + orderTopList.length);
+        return orderTopList;
     },
 
     // ATユニットがとろうとしている行動内容に応じて予測行動順リストを取得する
@@ -843,6 +886,62 @@ var WaitTurnOrderManager = {
         }
 
         return MoveResult.CONTINUE;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        キーボードのA/Sキーでユニットの行動順にマップカーソルを遷移する
+    *----------------------------------------------------------------------------------------------------------------*/
+    MapEdit._changeTarget = function (isNext) {
+        var i, unit;
+        var targetUnit = this.getEditTarget();
+        var list = WaitTurnOrderManager.getOrderTopList();
+        var count = list.length;
+        var index = 0;
+
+        if (targetUnit != null) {
+            for (i = 0; i < count; i++) {
+                unit = list[i].unit;
+
+                if (targetUnit.getId() === unit.getId()) {
+                    index = i;
+                    break;
+                }
+            }
+        } else {
+            index = isNext ? -1 : 1;
+        }
+
+        for (;;) {
+            if (isNext) {
+                index++;
+            } else {
+                index--;
+            }
+
+            if (index >= count) {
+                index = 0;
+            } else if (index < 0) {
+                index = count - 1;
+            }
+
+            obj = list[index];
+            if (obj == null || obj.unit == null) {
+                break;
+            }
+
+            unit = obj.unit;
+
+            if (!unit.isWait()) {
+                this._activeIndex = index;
+                this._setUnit(unit);
+                this._setFocus(unit);
+                break;
+            }
+
+            if (index === this._activeIndex) {
+                break;
+            }
+        }
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
