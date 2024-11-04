@@ -582,6 +582,17 @@ var WaitTurnOrderManager = {
 
 (function () {
     /*-----------------------------------------------------------------------------------------------------------------
+        出撃準備画面で出撃ユニットを変更時、行動順リストを初期化する
+    *----------------------------------------------------------------------------------------------------------------*/
+    UnitSortieScreen._moveSelect = function () {
+        var index = this._leftWindow.getUnitListIndex();
+
+        SceneManager.getActiveScene().getSortieSetting().setSortieMark(index);
+        WaitTurnOrderManager.initialize();
+        return MoveResult.CONTINUE;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         マップ開始時、ATユニットの所属に応じて最初のフェイズを決定する
     *----------------------------------------------------------------------------------------------------------------*/
     TurnChangeMapStart.doLastAction = function () {
