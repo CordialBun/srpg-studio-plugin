@@ -1218,6 +1218,46 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        ユニットメニューにWT値を表示する
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias005 = UnitMenuTopWindow.drawWindowContent;
+    UnitMenuTopWindow.drawWindowContent = function (x, y) {
+        alias005.call(this, x, y);
+
+        this._drawUnitWT(x, y);
+    };
+
+    UnitMenuTopWindow._drawUnitHp = function (xBase, yBase) {
+        var x = xBase + 303;
+        var y = yBase + 50;
+        var pic = root.queryUI("unit_gauge");
+
+        y -= 16; // HPの位置を変更する
+
+        ContentRenderer.drawUnitHpZoneEx(x, y, this._unit, pic, this._mhp);
+    };
+
+    UnitMenuTopWindow._drawUnitWT = function (xBase, yBase) {
+        var x, y, curWT, unitWT;
+        var unit = this._unit;
+
+        if (unit == null || typeof unit.custom.curWT !== "number") {
+            return;
+        }
+
+        curWT = unit.custom.curWT;
+        unitWT = WaitTurnOrderManager.calcUnitWT(unit);
+
+        x = xBase + 303;
+        y = yBase + 70;
+
+        TextRenderer.drawSignText(x, y, "WT");
+        NumberRenderer.drawNumber(x + 44, y - 1, curWT);
+        TextRenderer.drawSignText(x + 60, y, "/");
+        NumberRenderer.drawNumber(x + 98, y - 1, unitWT);
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         ユニット情報にWT値を表示する
     *----------------------------------------------------------------------------------------------------------------*/
     UnitSimpleRenderer.drawContentEx = function (x, y, unit, textui, mhp) {
@@ -1250,9 +1290,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップ上のユニットのキャラチップ上に行動順を描画する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias005 = MapLayer.drawUnitLayer;
+    var alias006 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias005.call(this);
+        alias006.call(this);
 
         this.drawWaitTurnOrderNumber();
     };
@@ -1412,9 +1452,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias006 = ConfigWindow._configureConfigItem;
+    var alias007 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias006.call(this, groupArray);
+        alias007.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
