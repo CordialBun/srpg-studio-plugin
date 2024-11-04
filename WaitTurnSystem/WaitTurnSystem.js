@@ -593,6 +593,31 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        出撃準備画面でアイテム交換やストック交換を実行時、行動順リストを初期化する
+    *----------------------------------------------------------------------------------------------------------------*/
+    ItemControl.updatePossessionItem = function (unit) {
+        var scene = root.getCurrentScene();
+        var mhp = ParamBonus.getMhp(unit);
+
+        // シーンがFREEでもEVENTでもない場合は、常にHPは最大HPと一致する。
+        // この処理を忘れた場合は、アイテム交換やアイテム増減でHPが変化する。
+        if (scene !== SceneType.FREE && scene !== SceneType.EVENT) {
+            unit.setHp(mhp);
+        }
+
+        if (scene === SceneType.BATTLESETUP) {
+            WaitTurnOrderManager.initialize();
+        }
+
+        // HPは最大HPを超えてはならない
+        if (unit.getHp() > mhp) {
+            unit.setHp(mhp);
+        } else if (unit.getHp() < 1) {
+            unit.setHp(1);
+        }
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         マップ開始時、ATユニットの所属に応じて最初のフェイズを決定する
     *----------------------------------------------------------------------------------------------------------------*/
     TurnChangeMapStart.doLastAction = function () {
@@ -906,28 +931,6 @@ var WaitTurnOrderManager = {
         unit.custom.isPredicting = true;
 
         this._commandScrollbar.drawScrollbar(x, y);
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        アイテム交換後に待機を選択した場合にも行動したと判定できるようにする
-    *----------------------------------------------------------------------------------------------------------------*/
-    ItemControl.updatePossessionItem = function (unit) {
-        var scene = root.getCurrentScene();
-        var mhp = ParamBonus.getMhp(unit);
-        var atUnit = WaitTurnOrderManager.getATUnit();
-
-        // シーンがFREEでもEVENTでもない場合は、常にHPは最大HPと一致する。
-        // この処理を忘れた場合は、アイテム交換やアイテム増減でHPが変化する。
-        if (scene !== SceneType.FREE && scene !== SceneType.EVENT) {
-            unit.setHp(mhp);
-        }
-
-        // HPは最大HPを超えてはならない
-        if (unit.getHp() > mhp) {
-            unit.setHp(mhp);
-        } else if (unit.getHp() < 1) {
-            unit.setHp(1);
-        }
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
