@@ -206,6 +206,10 @@ Ver.1.10 2024/3/24  現在のマップの合計WT値を取得する機能を追�
 /*-----------------------------------------------------------------------------------------------------------------
     設定項目
 *----------------------------------------------------------------------------------------------------------------*/
+// 重量計算でユニットの所持アイテム全てを参照する場合はtrue、装備武器のみ参照する場合はfalse
+var IS_ALL_BELONGINGS_APPLICABLE = true;
+
+// 行動順リストの描画に関するパラメータ
 var WaitTurnOrderParam = {
     ORDER_LIST_START_POS_Y: 0, // 行動順リストの開始位置のy座標
     ORDER_LIST_UNIT_NUM: 15 // 行動順リストのユニット表示数
@@ -474,7 +478,7 @@ var WaitTurnOrderManager = {
 
     // ユニットの基本WT値を計算する
     calcUnitWT: function (unit) {
-        var unitClass, classWT, defaultWT, spd, i, count, item, weight;
+        var unitClass, classWT, defaultWT, spd, i, count, item;
         var totalWeight = 0;
 
         if (unit === null) {
@@ -491,11 +495,17 @@ var WaitTurnOrderManager = {
 
         spd = RealBonus.getSpd(unit);
 
-        count = UnitItemControl.getPossessionItemCount(unit);
-        for (i = 0; i < count; i++) {
-            item = UnitItemControl.getItem(unit, i);
-            weight = item.getWeight();
-            totalWeight += weight;
+        if (IS_ALL_BELONGINGS_APPLICABLE) {
+            // 所持アイテム全ての重量を参照する
+            count = UnitItemControl.getPossessionItemCount(unit);
+            for (i = 0; i < count; i++) {
+                item = UnitItemControl.getItem(unit, i);
+                totalWeight += item.getWeight();
+            }
+        } else {
+            // 装備武器の重量のみ参照する
+            item = ItemControl.getEquippedWeapon(unit);
+            totalWeight += item.getWeight();
         }
 
         defaultWT = classWT - spd + totalWeight;
