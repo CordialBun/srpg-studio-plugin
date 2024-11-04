@@ -195,10 +195,10 @@ SRPG Studio version:1.291
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.1  2024/3/34  現在のマップの合計WT値を取得する機能を追加。
+Ver.1.00 2024/3/23  初版
+Ver.1.10 2024/3/24  現在のマップの合計WT値を取得する機能を追加。
                     オープニングイベントに特定のイベントコマンドがあるとエラー落ちする不具合を修正。
                     行動終了後に加算されるWT値を計算するとき、小数点以下を切り捨てる処理がされていなかった不具合を修正。
-Ver.1.0  2024/3/23  初版
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -482,11 +482,7 @@ var WaitTurnOrderManager = {
 
         unitClass = unit.getClass();
 
-        if (
-            unitClass.custom.classWT == null ||
-            typeof unitClass.custom.classWT !== "number" ||
-            unitClass.custom.classWT < 0
-        ) {
+        if (unitClass.custom.classWT == null || typeof unitClass.custom.classWT !== "number" || unitClass.custom.classWT < 0) {
             classWT = 0;
         } else {
             classWT = unitClass.custom.classWT;
@@ -1488,12 +1484,8 @@ var WaitTurnOrderManager = {
     *----------------------------------------------------------------------------------------------------------------*/
     MouseControl._adjustMapCursor = function () {
         var session = root.getCurrentSession();
-        var xCursor = Math.floor(
-            (root.getMouseX() + session.getScrollPixelX() - root.getViewportX()) / GraphicsFormat.MAPCHIP_WIDTH
-        );
-        var yCursor = Math.floor(
-            (root.getMouseY() + session.getScrollPixelY() - root.getViewportY()) / GraphicsFormat.MAPCHIP_HEIGHT
-        );
+        var xCursor = Math.floor((root.getMouseX() + session.getScrollPixelX() - root.getViewportX()) / GraphicsFormat.MAPCHIP_WIDTH);
+        var yCursor = Math.floor((root.getMouseY() + session.getScrollPixelY() - root.getViewportY()) / GraphicsFormat.MAPCHIP_HEIGHT);
 
         if (xCursor > CurrentMap.getWidth() - 1 - 2) {
             xCursor = CurrentMap.getWidth() - 1 - 2;
