@@ -14,9 +14,8 @@
 
 1.名前、マップアニメ、リアルアニメは任意のものを設定する。
 2.持続ターンを1に設定する。
-3.封印の「物理攻撃」「魔法攻撃」にチェックを入れる。
-4.自動解除条件を「戦闘に入った」「1回目で解除」に設定する。
-5.その他の項目はデフォルトのままにしておく。
+3.自動解除条件を「戦闘に入った」「1回目で解除」に設定する。
+4.その他の項目はデフォルトのままにしておく。
 
 ステートの設定完了後、本プラグインの設定項目のBREAK_STATE_IDの数値を上記のステートのIDに変更してください。
 
@@ -86,8 +85,12 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
 
         if (isPreemptive && compatible !== null && skill === null) {
             state = root.getBaseData().getStateList().getDataFromId(BREAK_STATE_ID);
-            attackEntry.stateArrayPassive.push(state);
-            virtualPassive.stateArray.push(state);
+
+            // 既にブレイク状態になっている場合、重ねがけはしない
+            if (StateControl.getTurnState(passive, state) === null) {
+                attackEntry.stateArrayPassive.push(state);
+                virtualPassive.stateArray.push(state);
+            }
         }
     };
 
@@ -133,13 +136,46 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        ブレイク状態のユニットは攻撃できない
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias003 = VirtualAttackControl._isAttackStopState;
+    VirtualAttackControl._isAttackStopState = function (virtualAttackUnit, state) {
+        var isAttackStopState = alias003.call(this, virtualAttackUnit, state);
+
+        if (state === null) {
+            return false;
+        }
+
+        if (state.getId() === BREAK_STATE_ID) {
+            return true;
+        }
+
+        return isAttackStopState;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        戦闘予測画面でブレイク状態のユニットの攻撃・命中・必殺を空欄にする
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias004 = AttackChecker.getAttackStatusInternal;
+    AttackChecker.getAttackStatusInternal = function (unit, weapon, targetUnit) {
+        var arr = alias004.call(this, unit, weapon, targetUnit);
+        var state = root.getBaseData().getStateList().getDataFromId(BREAK_STATE_ID);
+
+        if (StateControl.getTurnState(unit, state) === null) {
+            return arr;
+        }
+
+        return [, , ,];
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         ブレイク状態は所属フェイズの開始時に回復する
     *----------------------------------------------------------------------------------------------------------------*/
     // ウェイトターンシステムと併用している場合、ステートの更新処理はウェイトターンシステム側で行う
     if (!WAIT_TURN_SYSTEM_COEXISTS) {
-        var alias003 = StateTurnFlowEntry._checkStateTurn;
+        var alias005 = StateTurnFlowEntry._checkStateTurn;
         StateTurnFlowEntry._checkStateTurn = function () {
-            alias003.call(this);
+            alias005.call(this);
             var i, j, unitList, unitCount, unit, turnStateList, turnStateCount, turnState, state;
             var turnType = root.getCurrentSession().getTurnType();
 
