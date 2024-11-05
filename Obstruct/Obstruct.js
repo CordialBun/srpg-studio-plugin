@@ -1099,18 +1099,13 @@ CDB_checkEnemyCountExcludedObstacle = function (count, overUnderType, aliveType)
 
     switch (aliveType) {
         case AliveType.ALIVE:
-            enemyCount = EnemyList.getAliveList() - obstacleCount;
+            enemyCount = EnemyList.getAliveList().getCount() - obstacleCount;
             break;
         case AliveType.DEATH:
-            enemyCount = EnemyList.getDeathList() - defeatedObstacleCount;
+            enemyCount = EnemyList.getDeathList().getCount() - defeatedObstacleCount;
             break;
         default:
             return result;
-    }
-
-    if (typeof obstacleCount !== "number") {
-        obstacleCount = 0;
-        mapInfo.custom.obstacleCount = obstacleCount;
     }
 
     if (overUnderType === OverUnderType.EQUAL && count === enemyCount) {
