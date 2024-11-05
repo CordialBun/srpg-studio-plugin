@@ -13,16 +13,22 @@
 ステートを作成し、以下の設定を行ってください。
 
 1.名前、マップアニメ、リアルアニメは任意のものを設定する。
-2.封印の「物理攻撃」「魔法攻撃」にチェックを入れる。
-3.自動解除条件を「戦闘に入った」「1回目で解除」に設定する。
-4.その他の項目はデフォルトのままにしておく。
+2.持続ターンを1に設定する。
+3.封印の「物理攻撃」「魔法攻撃」にチェックを入れる。
+4.自動解除条件を「戦闘に入った」「1回目で解除」に設定する。
+5.その他の項目はデフォルトのままにしておく。
 
-ステートの設定完了後、本プラグインの52行目の数値を上記のステートのIDに変更してください。
+ステートの設定完了後、本プラグインの設定項目のBREAK_STATE_IDの数値を上記のステートのIDに変更してください。
 
 
 【ブレイク無効スキル】
 ボスユニットや特定の兵種など、ブレイク状態にさせたくないユニットがいる場合は、
 カスタムスキルを作成してキーワードに resistBreak を設定することでブレイク状態を無効にするスキルを実装できます。
+
+
+【ウェイトターンシステムとの併用】
+プラグイン「ウェイトターンシステム」と併用したい場合、設定項目のWAIT_TURN_SYSTEM_COEXISTSをtrueに変更してください。
+ウェイトターンシステムにおいては、ブレイク状態のユニットは自身のアタックターン開始時にブレイク状態が解除される仕様になっています。
 
 
 【作者】
@@ -47,9 +53,12 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
 
 (function () {
     /*-----------------------------------------------------------------------------------------------------------------
-        パラメータ
+        設定項目
     *----------------------------------------------------------------------------------------------------------------*/
-    var BREAK_STATE_ID = 6; // ブレイク状態のステートのID
+    // ウェイトターンシステムと併用する場合はtrue、しない場合はfalse
+    var WAIT_TURN_SYSTEM_COEXISTS = false;
+    // ブレイク状態のステートのID
+    var BREAK_STATE_ID = 6;
 
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘を仕掛けた側のユニットに印をつけておく
@@ -126,34 +135,37 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
     /*-----------------------------------------------------------------------------------------------------------------
         ブレイク状態は所属フェイズの開始時に回復する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias003 = StateTurnFlowEntry._checkStateTurn;
-    StateTurnFlowEntry._checkStateTurn = function () {
-        alias003.call(this);
-        var i, j, unitList, unitCount, unit, turnStateList, turnStateCount, turnState, state;
-        var turnType = root.getCurrentSession().getTurnType();
+    // ウェイトターンシステムと併用している場合、ステートの更新処理はウェイトターンシステム側で行う
+    if (!WAIT_TURN_SYSTEM_COEXISTS) {
+        var alias003 = StateTurnFlowEntry._checkStateTurn;
+        StateTurnFlowEntry._checkStateTurn = function () {
+            alias003.call(this);
+            var i, j, unitList, unitCount, unit, turnStateList, turnStateCount, turnState, state;
+            var turnType = root.getCurrentSession().getTurnType();
 
-        if (turnType === TurnType.PLAYER) {
-            unitList = PlayerList.getSortieList();
-        } else if (turnType === TurnType.ENEMY) {
-            unitList = EnemyList.getAliveList();
-        } else if (turnType === TurnType.ALLY) {
-            unitList = AllyList.getAliveList();
-        }
+            if (turnType === TurnType.PLAYER) {
+                unitList = PlayerList.getSortieList();
+            } else if (turnType === TurnType.ENEMY) {
+                unitList = EnemyList.getAliveList();
+            } else if (turnType === TurnType.ALLY) {
+                unitList = AllyList.getAliveList();
+            }
 
-        unitCount = unitList.getCount();
-        for (i = 0; i < unitCount; i++) {
-            unit = unitList.getData(i);
-            turnStateList = unit.getTurnStateList();
-            turnStateCount = turnStateList.getCount();
+            unitCount = unitList.getCount();
+            for (i = 0; i < unitCount; i++) {
+                unit = unitList.getData(i);
+                turnStateList = unit.getTurnStateList();
+                turnStateCount = turnStateList.getCount();
 
-            for (j = 0; j < turnStateCount; j++) {
-                turnState = turnStateList.getData(j);
-                state = turnState.getState();
+                for (j = 0; j < turnStateCount; j++) {
+                    turnState = turnStateList.getData(j);
+                    state = turnState.getState();
 
-                if (state.getId() === BREAK_STATE_ID) {
-                    StateControl.arrangeState(unit, state, IncreaseType.DECREASE);
+                    if (state.getId() === BREAK_STATE_ID) {
+                        StateControl.arrangeState(unit, state, IncreaseType.DECREASE);
+                    }
                 }
             }
-        }
-    };
+        };
+    }
 })();
