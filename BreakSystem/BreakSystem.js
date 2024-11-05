@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-ブレイクシステム＆ブレイク無効スキル Ver.1.10
+ブレイクシステム＆ブレイク無効スキル Ver.1.20
 
 
 【概要】
@@ -18,6 +18,12 @@
 4.その他の項目はデフォルトのままにしておく。
 
 ステートの設定完了後、本プラグインの設定項目のBREAK_STATE_IDの数値を上記のステートのIDに変更してください。
+
+
+【敵AIがブレイクできる相手を狙う優先度】
+設定項目のBREAK_PRIORITY_RATEを1より大きい数値にすることで、
+敵AIがブレイクできる相手を優先的に狙うように設定できます。
+数値が大きければ大きいほど優先度が上がりやすくなります。
 
 
 【ブレイク無効スキル】
@@ -44,8 +50,11 @@ SRPG Studio version:1.303
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.00  2024/10/29  初版
-Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装できる機能を追加。
+Ver.1.00 2024/10/29 初版
+Ver.1.10 2024/11/03 ブレイク状態を無効にするスキルを実装できる機能を追加。
+Ver.1.20 2024/11/05 ウェイトターンシステムとの併用に対応。
+                    敵AIがブレイクできる相手を優先的に狙うよう設定できる機能を追加。
+                    ブレイク状態の仕様を「物理攻撃、魔法攻撃が封印され、武器の装備もできない」から「攻撃ができなくなるが、武器は装備している扱いになる」に変更。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -58,6 +67,9 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
     var WAIT_TURN_SYSTEM_COEXISTS = false;
     // ブレイク状態のステートのID
     var BREAK_STATE_ID = 6;
+    // 敵AIがブレイクできる相手を狙う優先度
+    // 1なら通常と同じで、1より大きければ大きいほど優先して狙う
+    var BREAK_PRIORITY_RATE = 1.5;
 
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘を仕掛けた側のユニットに印をつけておく
@@ -169,13 +181,32 @@ Ver.1.10  2024/11/03  ブレイク状態を無効にするスキルを実装で�
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        敵AIはブレイクできる相手を優先して狙う
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias005 = AIScorer.Weapon._getTotalScore;
+    AIScorer.Weapon._getTotalScore = function (unit, combination) {
+        var score = alias005.call(this, unit, combination);
+        var targetUnit = combination.targetUnit;
+        var weapon = combination.item;
+        var compatible = CompatibleCalculator._getCompatible(unit, targetUnit, weapon);
+        var skill = SkillControl.getPossessionCustomSkill(targetUnit, "resistBreak");
+        var state = root.getBaseData().getStateList().getDataFromId(BREAK_STATE_ID);
+
+        if (compatible !== null && skill === null && StateControl.getTurnState(targetUnit, state) === null) {
+            score *= BREAK_PRIORITY_RATE;
+        }
+
+        return score;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         ブレイク状態は所属フェイズの開始時に回復する
     *----------------------------------------------------------------------------------------------------------------*/
     // ウェイトターンシステムと併用している場合、ステートの更新処理はウェイトターンシステム側で行う
     if (!WAIT_TURN_SYSTEM_COEXISTS) {
-        var alias005 = StateTurnFlowEntry._checkStateTurn;
+        var alias006 = StateTurnFlowEntry._checkStateTurn;
         StateTurnFlowEntry._checkStateTurn = function () {
-            alias005.call(this);
+            alias006.call(this);
             var i, j, unitList, unitCount, unit, turnStateList, turnStateCount, turnState, state;
             var turnType = root.getCurrentSession().getTurnType();
 
