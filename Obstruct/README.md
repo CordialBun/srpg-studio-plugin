@@ -22,6 +22,7 @@
         -   [2.7. マップのカスタムパラメータの設定](#27-マップのカスタムパラメータの設定)
     -   [3. 追加設定](#3-追加設定)
         -   [3.1. イベントの実行条件に敵軍ユニットの総数を設定したいとき](#31-イベントの実行条件に敵軍ユニットの総数を設定したいとき)
+        -   [3.2. ウェイトターンシステムと併用したいとき](#32-ウェイトターンシステムと併用したいとき)
     -   [4. 補足](#4-補足)
         -   [4.1. 敵軍ユニットが障害物を攻撃する条件](#41-敵軍ユニットが障害物を攻撃する条件)
         -   [4.2. 1 ターンに設置する障害物の個数について(※重要)](#42-1-ターンに設置する障害物の個数について重要)
@@ -59,7 +60,7 @@ Obstruct.js をプロジェクトの Plugin フォルダ配下に保存してく
 
 ### 2.2. スクリプト内の変数の設定
 
-![image](https://github.com/user-attachments/assets/6144b835-a9b1-492f-a678-3e9e635d6572)
+![image](https://github.com/user-attachments/assets/2c50cef1-4c6c-41a0-b60b-041bb0e2f78a)
 
 Obstruct.js 内の設定項目を必要に応じて変更してください。
 
@@ -150,9 +151,7 @@ Obstruct.js 内の設定項目を必要に応じて変更してください。
 具体的には、「ユニットの総数」タブは使わず、実行条件のスクリプトに以下を設定します。
 
 ```
-{
-    CDB_checkEnemyCountExcludedObstacle(count, overUnderType, aliveType)
-}
+CDB_checkEnemyCountExcludedObstacle(count, overUnderType, aliveType)
 ```
 
 count は総数の数値を、overUnderType と aliveType は指定したい条件に応じて以下を入力します。
@@ -178,10 +177,20 @@ count は総数の数値を、overUnderType と aliveType は指定したい条�
 例えば、「死亡している敵軍ユニットの総数が 10 体以上」を条件にしたいときは以下のように入力します。
 
 ```
-{
-    CDB_checkEnemyCountExcludedObstacle(10, OverUnderType.OVER, AliveType.DEATH)
-}
+CDB_checkEnemyCountExcludedObstacle(10, OverUnderType.OVER, AliveType.DEATH)
 ```
+
+<br>
+
+### 3.2. ウェイトターンシステムと併用したいとき
+
+![image](https://github.com/user-attachments/assets/e96fbcb0-4d58-4ceb-a6bc-7096a2d19cc4)
+
+プラグイン「ウェイトターンシステム」と本プラグインを併用する場合、  
+設定項目の WAIT_TURN_SYSTEM_COEXISTS の値を true に変更してください。
+
+ウェイトターンシステムとの併用時は、障害物が消滅するタイミングが  
+「次の自軍フェイズ開始時」→「設置したユニットの次のアタックターン開始時」に変更されます。
 
 <br>
 
