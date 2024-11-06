@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-障害物を設置する杖 Ver.1.00
+障害物を設置する杖 Ver.1.10
 
 
 【概要】
@@ -35,8 +35,9 @@ SRPG Studio version:1.303
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.00  2024/11/2  初版
-
+Ver.1.00 2024/11/02 初版
+Ver.1.10 2024/11/05 ウェイトターンシステムとの併用に対応。
+                    敵軍ユニットの総数を判定する機能が正常に動作しない不具合を修正。
 
 *----------------------------------------------------------------------------------------------------------------*/
 
@@ -44,7 +45,10 @@ Ver.1.00  2024/11/2  初版
     /*-----------------------------------------------------------------------------------------------------------------
         設定項目
     *----------------------------------------------------------------------------------------------------------------*/
-    var OBSTRUCT_ITEM_TYPE_NAME = "障害物設置"; // アイテムウィンドウに表示するテキスト
+    // ウェイトターンシステムと併用する場合はtrue、しない場合はfalse
+    var WAIT_TURN_SYSTEM_COEXISTS = false;
+    // アイテムウィンドウに表示するテキスト
+    var OBSTRUCT_ITEM_TYPE_NAME = "障害物設置";
 
     /*-----------------------------------------------------------------------------------------------------------------
         障害物を設置する杖の実装
@@ -187,7 +191,7 @@ Ver.1.00  2024/11/2  初版
         },
 
         mainAction: function () {
-            var i, x, y, count, unit, pageData, generator;
+            var i, x, y, count, unit, pageData, generator, userId;
             var posData = null;
             var mapInfo = root.getCurrentSession().getCurrentMapInfo();
             var dummyX = mapInfo.custom.obstructDummyX;
@@ -222,6 +226,11 @@ Ver.1.00  2024/11/2  初版
                 unit.setMapX(this._targetPos.x);
                 unit.setMapY(this._targetPos.y);
                 UnitProvider.setupFirstUnit(unit);
+
+                if (WAIT_TURN_SYSTEM_COEXISTS) {
+                    userId = this._itemUseParent._itemTargetInfo.unit.getId();
+                    unit.custom.userId = userId;
+                }
             }
         },
 
@@ -925,16 +934,32 @@ Ver.1.00  2024/11/2  初版
         },
 
         _checkObstacle: function () {
-            var i, unit, isObstacle;
+            var i, unit, isObstacle, atUnit, userId;
             var list = EnemyList.getAliveList();
             var count = list.getCount();
+
+            if (WAIT_TURN_SYSTEM_COEXISTS) {
+                atUnit = WaitTurnOrderManager.getATUnit();
+
+                if (atUnit === null) {
+                    return;
+                }
+            }
 
             for (i = 0; i < count; i++) {
                 unit = list.getData(i);
                 isObstacle = unit.custom.isObstacle;
 
                 if (typeof isObstacle === "boolean" && isObstacle) {
-                    this._obstacleArray.push(unit);
+                    if (WAIT_TURN_SYSTEM_COEXISTS) {
+                        userId = unit.custom.userId;
+
+                        if (typeof userId === "number" && atUnit.getId() === userId) {
+                            this._obstacleArray.push(unit);
+                        }
+                    } else {
+                        this._obstacleArray.push(unit);
+                    }
                 }
             }
         },
