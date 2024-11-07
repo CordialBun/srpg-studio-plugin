@@ -3318,11 +3318,23 @@ var GetNumberTokenStateType = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        ユニット登場時の処理
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias000 = ScriptCall_AppearEventUnit;
+    ScriptCall_AppearEventUnit = function (unit) {
+        alias000.call(this, unit);
+
+        if (root.getCurrentScene() === SceneType.EVENT) {
+            RewindTimeManager.addUnit(unit);
+        }
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時の処理
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias000 = ReinforcementChecker._appearUnit;
+    var alias001 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias000.call(this, pageData, x, y);
+        var unit = alias001.call(this, pageData, x, y);
 
         if (unit !== null) {
             RewindTimeManager.addUnit(unit);
@@ -3335,15 +3347,15 @@ var GetNumberTokenStateType = {
         各ユニットコマンドに対応するレコードの種類を設定する
     *----------------------------------------------------------------------------------------------------------------*/
     // 攻撃
-    var alias001 = UnitCommand.Attack.openCommand;
+    var alias002 = UnitCommand.Attack.openCommand;
     UnitCommand.Attack.openCommand = function () {
-        alias001.call(this);
+        alias002.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_ATTACK);
     };
 
     // 待機
-    var alias002 = UnitCommand.Wait.openCommand;
+    var alias003 = UnitCommand.Wait.openCommand;
     UnitCommand.Wait.openCommand = function () {
         var curRecordType = RewindTimeManager.getCurRecordType();
         var isRepeatMoveMode = RewindTimeManager.isRepeatMoveMode();
@@ -3352,166 +3364,166 @@ var GetNumberTokenStateType = {
             RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
         }
 
-        alias002.call(this);
+        alias003.call(this);
     };
 
     // 占拠
-    var alias003 = UnitCommand.Occupation.openCommand;
+    var alias004 = UnitCommand.Occupation.openCommand;
     UnitCommand.Occupation.openCommand = function () {
-        alias003.call(this);
+        alias004.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_OCCUPATION);
     };
 
     // 宝箱
-    var alias004 = UnitCommand.Treasure.openCommand;
+    var alias005 = UnitCommand.Treasure.openCommand;
     UnitCommand.Treasure.openCommand = function () {
-        alias004.call(this);
+        alias005.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_TREASURE);
     };
 
     // 村
-    var alias005 = UnitCommand.Village.openCommand;
+    var alias006 = UnitCommand.Village.openCommand;
     UnitCommand.Village.openCommand = function () {
-        alias005.call(this);
+        alias006.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_VILLAGE);
     };
 
     // 店
-    var alias006 = UnitCommand.Shop.openCommand;
+    var alias007 = UnitCommand.Shop.openCommand;
     UnitCommand.Shop.openCommand = function () {
-        alias006.call(this);
+        alias007.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_SHOP);
     };
 
     // 扉
-    var alias007 = UnitCommand.Gate.openCommand;
+    var alias008 = UnitCommand.Gate.openCommand;
     UnitCommand.Gate.openCommand = function () {
-        alias007.call(this);
+        alias008.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_GATE);
     };
 
     // 盗む
-    var alias008 = UnitCommand.Steal.openCommand;
+    var alias009 = UnitCommand.Steal.openCommand;
     UnitCommand.Steal.openCommand = function () {
-        alias008.call(this);
+        alias009.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_STEAL);
     };
 
     // 杖
-    var alias009 = UnitCommand.Wand.openCommand;
+    var alias010 = UnitCommand.Wand.openCommand;
     UnitCommand.Wand.openCommand = function () {
-        alias009.call(this);
+        alias010.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAND);
     };
 
     // 情報
-    var alias010 = UnitCommand.Information.openCommand;
+    var alias011 = UnitCommand.Information.openCommand;
     UnitCommand.Information.openCommand = function () {
-        alias010.call(this);
+        alias011.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
     };
 
     // アイテム
-    var alias011 = UnitCommand.Item.openCommand;
+    var alias012 = UnitCommand.Item.openCommand;
     UnitCommand.Item.openCommand = function () {
-        alias011.call(this);
+        alias012.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_ITEM);
     };
 
     // 交換
-    var alias012 = UnitCommand.Trade.openCommand;
+    var alias013 = UnitCommand.Trade.openCommand;
     UnitCommand.Trade.openCommand = function () {
-        alias012.call(this);
-
-        RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
-    };
-
-    // ストック
-    var alias013 = UnitCommand.Stock.openCommand;
-    UnitCommand.Stock.openCommand = function () {
         alias013.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
     };
 
-    // 形態変化
-    var alias014 = UnitCommand.Metamorphoze.openCommand;
-    UnitCommand.Metamorphoze.openCommand = function () {
+    // ストック
+    var alias014 = UnitCommand.Stock.openCommand;
+    UnitCommand.Stock.openCommand = function () {
         alias014.call(this);
+
+        RewindTimeManager.setCurRecordType(RecordType.UNIT_WAIT);
+    };
+
+    // 形態変化
+    var alias015 = UnitCommand.Metamorphoze.openCommand;
+    UnitCommand.Metamorphoze.openCommand = function () {
+        alias015.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_METAMORPHOZE);
     };
 
     // 形態変化解除
-    var alias015 = UnitCommand.MetamorphozeCancel.openCommand;
+    var alias016 = UnitCommand.MetamorphozeCancel.openCommand;
     UnitCommand.MetamorphozeCancel.openCommand = function () {
-        alias015.call(this);
+        alias016.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_METAMORCANCEL);
     };
 
     // フュージョン攻撃
-    var alias016 = UnitCommand.FusionAttack.openCommand;
+    var alias017 = UnitCommand.FusionAttack.openCommand;
     UnitCommand.FusionAttack.openCommand = function () {
-        alias016.call(this);
+        alias017.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONATTACK);
     };
 
     // フュージョン(キャッチ)
-    var alias017 = UnitCommand.FusionCatch.openCommand;
+    var alias018 = UnitCommand.FusionCatch.openCommand;
     UnitCommand.FusionCatch.openCommand = function () {
-        alias017.call(this);
+        alias018.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONCATCH);
     };
 
     // フュージョン(リリース)
-    var alias018 = UnitCommand.FusionRelease.openCommand;
+    var alias019 = UnitCommand.FusionRelease.openCommand;
     UnitCommand.FusionRelease.openCommand = function () {
-        alias018.call(this);
+        alias019.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONRELEASE);
     };
 
     // フュージョン(トレード)
-    var alias019 = UnitCommand.FusionUnitTrade.openCommand;
+    var alias020 = UnitCommand.FusionUnitTrade.openCommand;
     UnitCommand.FusionUnitTrade.openCommand = function () {
-        alias019.call(this);
+        alias020.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_FUSIONTRADE);
     };
 
     // 行動回復
-    var alias020 = UnitCommand.Quick.openCommand;
+    var alias021 = UnitCommand.Quick.openCommand;
     UnitCommand.Quick.openCommand = function () {
-        alias020.call(this);
+        alias021.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_QUICK);
     };
 
     // 場所イベント(カスタム)
-    var alias021 = UnitCommand.PlaceCommand.openCommand;
+    var alias022 = UnitCommand.PlaceCommand.openCommand;
     UnitCommand.PlaceCommand.openCommand = function () {
-        alias021.call(this);
+        alias022.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_PLACECOMMAND);
         RewindTimeManager.setPlaceCommandName(this.getCommandName());
     };
 
     // 会話
-    var alias022 = UnitCommand.Talk.openCommand;
+    var alias023 = UnitCommand.Talk.openCommand;
     UnitCommand.Talk.openCommand = function () {
-        alias022.call(this);
+        alias023.call(this);
 
         RewindTimeManager.setCurRecordType(RecordType.UNIT_TALK);
         RewindTimeManager.setTalkCommandName(this.getCommandName());
@@ -3632,9 +3644,9 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップコマンドを追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias023 = MapCommand.configureCommands;
+    var alias024 = MapCommand.configureCommands;
     MapCommand.configureCommands = function (groupArray) {
-        alias023.call(this, groupArray);
+        alias024.call(this, groupArray);
 
         groupArray.insertObject(MapCommand.RewindTime, REWIND_COMMAND_INDEX);
     };
@@ -3852,9 +3864,9 @@ var GetNumberTokenStateType = {
         return screenParam;
     };
 
-    var alias024 = GameOverChecker.isGameOver;
+    var alias025 = GameOverChecker.isGameOver;
     GameOverChecker.isGameOver = function () {
-        var isGameOver = alias024.call(this);
+        var isGameOver = alias025.call(this);
         var switchTable = root.getMetaSession().getGlobalSwitchTable();
         var index = switchTable.getSwitchIndexFromId(IS_GAME_OVER_SWITCH_ID);
 
