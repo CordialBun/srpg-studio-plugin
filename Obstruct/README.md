@@ -85,10 +85,19 @@ Obstruct.js 内の設定項目を必要に応じて変更してください。
 
 ![image](https://github.com/user-attachments/assets/29558179-baa0-4167-a85a-29775afd5c6d)
 
+![image](https://github.com/user-attachments/assets/72c6d6b2-7fcf-47f1-a958-d35d1a0c07c5)
+
 援軍ユニットを作成し、以下の項目を設定します。
 
 -   行動パターンを「待機型」にし、「行動できる場合でも待機する」にチェックを入れる
 -   アイテムは何も持たせない
+-   カスタムパラメータに以下を設定する
+
+```
+{
+    isObstacle: true
+}
+```
 
 このとき、クラスのキャラチップは全コマ同じ画像のものにすると見た目がマップチップっぽくなるのでオススメです。
 
