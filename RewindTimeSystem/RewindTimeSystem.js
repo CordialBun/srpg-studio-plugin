@@ -57,6 +57,9 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
 /*-----------------------------------------------------------------------------------------------------------------
     設定項目
 *----------------------------------------------------------------------------------------------------------------*/
+// ウェイトターンシステムと併用する場合はtrue、しない場合はfalse
+var WAIT_TURN_SYSTEM_COEXISTS = false;
+
 // 時戻しコマンドの名称
 var REWIND_COMMAND_NAME = "時戻し";
 // 時戻しコマンドを上から何番目に表示するか
@@ -133,7 +136,8 @@ var RecordType = {
     UNIT_TALK: 18, // 会話
     UNIT_WAIT: 19, // 待機
     PROGRESS_ENEMYPHASE: 20, // 敵軍フェイズ進行中
-    PROGRESS_ALLYPHASE: 21 // 同盟軍フェイズ進行中
+    PROGRESS_ALLYPHASE: 21, // 同盟軍フェイズ進行中
+    PLAYER_AT_START: 22 // 自軍ユニットのアタックターン開始(ウェイトターンシステムと併用時に使用)
 };
 
 // レコードの種類に対応する文字列
@@ -169,6 +173,40 @@ var PlaceCommandRecordTitleString = {
 // 会話イベントに対応する文字列
 var TalkCommandRecordTitleString = {
     会話: "が会話した"
+};
+
+// レコードの種類に対応する文字列(ウェイトターンシステムと併用時に使用)
+var WaitTurnRecordTitleString = {
+    1: "攻撃", // 攻撃
+    2: "杖", // 杖
+    3: "が盗んだ", // 盗む
+    4: "救出", // フュージョン(キャッチ)
+    5: "引き渡し", // フュージョン(トレード)
+    6: "降ろす", // フュージョン(リリース)
+    7: "捕獲", // フュージョン攻撃
+    8: "変身", // 形態変化
+    9: "変身解除", // 形態変化解除
+    10: "占拠", // 占拠
+    11: "宝箱", // 宝箱
+    12: "訪問", // 村
+    13: "買い物", // 店
+    14: "扉", // 扉
+    15: "踊り", // 行動回復
+    17: "アイテム", // アイテム
+    19: "待機", // 待機
+    20: "敵軍ユニット行動中", // 敵軍ユニット行動中
+    21: "同盟軍ユニット行動中", // 同盟軍ユニット行動中
+    22: "のターン" // 自軍ユニットのアタックターン開始
+};
+
+// 場所イベントに対応する文字列(ウェイトターンシステムと併用時に使用)
+var WaitTurnPlaceCommandRecordTitleString = {
+    調べる: "調べる"
+};
+
+// 会話イベントに対応する文字列(ウェイトターンシステムと併用時に使用)
+var WaitTurnTalkCommandRecordTitleString = {
+    会話: "会話"
 };
 
 // 設定項目はここまで
@@ -468,6 +506,14 @@ var RewindTimeManager = {
 
             this._recordArray = this._recordArray.slice(0, index + 1);
             this.updateLatestRecord();
+
+            if (WAIT_TURN_SYSTEM_COEXISTS) {
+                delete this._recordArray[this._recordArray.length - 1].actionType;
+            }
+        }
+
+        if (WAIT_TURN_SYSTEM_COEXISTS) {
+            WaitTurnOrderManager.rebuildList();
         }
     },
 
@@ -1093,7 +1139,7 @@ var RewindTimeManager = {
     },
 
     appendRecord: function (recordType) {
-        var unit = this._curActionUnit;
+        var unit, atUnit, atCount;
         var record = {};
         var newLatestRecord = {};
 
@@ -1103,10 +1149,31 @@ var RewindTimeManager = {
 
         record.recordType = recordType;
 
-        if (recordType !== RecordType.TURN_START && unit !== null) {
-            record.unitName = unit.getName();
+        if (WAIT_TURN_SYSTEM_COEXISTS) {
+            atUnit = WaitTurnOrderManager.getATUnit();
+
+            if (recordType === RecordType.PLAYER_AT_START && atUnit !== null) {
+                record.unitName = atUnit.getName();
+                atCount = atUnit.custom.atCount;
+
+                if (typeof atCount === "number") {
+                    record.atCount = atCount;
+                }
+            } else {
+                record.unitName = "";
+            }
+
+            if (this._recordArray.length > 0) {
+                this._recordArray[this._recordArray.length - 1].actionType = this.getCurRecordType();
+            }
         } else {
-            record.unitName = "";
+            unit = this._curActionUnit;
+
+            if (recordType !== RecordType.TURN_START && unit !== null) {
+                record.unitName = unit.getName();
+            } else {
+                record.unitName = "";
+            }
         }
 
         this.createRecord(record, newLatestRecord);
@@ -1982,17 +2049,29 @@ var RewindTimeManager = {
     },
 
     createMapCursorRecord: function (record, newLatestRecord, latestMapCursorParam, isFirstRecord, curSession) {
-        var pos;
+        var pos, atUnit;
         var mapCursorParam = {};
         var newLatestMapCursorParam = {};
 
-        if (isFirstRecord) {
-            pos = this.getDefaultCursorPos();
-            mapCursorParam.x = pos.x;
-            mapCursorParam.y = pos.y;
+        if (WAIT_TURN_SYSTEM_COEXISTS) {
+            atUnit = WaitTurnOrderManager.getATUnit();
+
+            if (atUnit !== null) {
+                mapCursorParam.x = atUnit.getMapX();
+                mapCursorParam.y = atUnit.getMapY();
+            } else {
+                mapCursorParam.x = curSession.getMapCursorX();
+                mapCursorParam.y = curSession.getMapCursorY();
+            }
         } else {
-            mapCursorParam.x = curSession.getMapCursorX();
-            mapCursorParam.y = curSession.getMapCursorY();
+            if (isFirstRecord) {
+                pos = this.getDefaultCursorPos();
+                mapCursorParam.x = pos.x;
+                mapCursorParam.y = pos.y;
+            } else {
+                mapCursorParam.x = curSession.getMapCursorX();
+                mapCursorParam.y = curSession.getMapCursorY();
+            }
         }
 
         newLatestMapCursorParam.x = mapCursorParam.x;
@@ -2404,33 +2483,44 @@ var RewindTimeManager = {
     },
 
     getRecordTitleArray: function () {
-        var i, count, record, recordType, unitName, text, recordTitle, placeCommandName, talkCommandName;
+        var i, count, record, recordType, actionType, unitName, text, recordTitle, placeCommandName, talkCommandName;
         var recordTitleArray = [];
         var recordArray = this._recordArray;
+        var recordTitleString = WAIT_TURN_SYSTEM_COEXISTS ? WaitTurnRecordTitleString : RecordTitleString;
+        var placeCommandRecordTitleString = WAIT_TURN_SYSTEM_COEXISTS ? WaitTurnPlaceCommandRecordTitleString : PlaceCommandRecordTitleString;
+        var talkCommandRecordTitleString = WAIT_TURN_SYSTEM_COEXISTS ? WaitTurnTalkCommandRecordTitleString : TalkCommandRecordTitleString;
 
         count = recordArray.length;
         for (i = 0; i < count; i++) {
             record = recordArray[i];
             recordType = record.recordType;
+            actionType = record.actionType;
             placeCommandName = this.getPlaceCommandName();
             talkCommandName = this.getTalkCommandName();
             unitName = record.unitName;
 
             if (recordType === RecordType.UNIT_PLACECOMMAND) {
-                text = unitName + PlaceCommandRecordTitleString[placeCommandName];
+                text = unitName + placeCommandRecordTitleString[placeCommandName];
             } else if (recordType === RecordType.UNIT_TALK) {
-                text = unitName + TalkCommandRecordTitleString[talkCommandName];
+                text = unitName + talkCommandRecordTitleString[talkCommandName];
             } else {
-                text = unitName + RecordTitleString[recordType];
+                text = unitName + recordTitleString[recordType];
             }
 
             if (recordType === RecordType.TURN_START) {
                 text = record.turnCount + text;
+            } else if (WAIT_TURN_SYSTEM_COEXISTS && recordType === RecordType.PLAYER_AT_START) {
+                text += record.atCount;
+            }
+
+            if (WAIT_TURN_SYSTEM_COEXISTS && typeof actionType === "number") {
+                text += " -> " + recordTitleString[actionType];
             }
 
             recordTitle = {
                 title: text,
                 isTurnStart: recordType === RecordType.TURN_START,
+                isLatest: i === count - 1,
 
                 getTitle: function () {
                     return this.title;
@@ -4361,7 +4451,9 @@ var GetNumberTokenStateType = {
 
             if (this._isGameOverRewind && index === count - 1) {
                 color = ColorValue.DISABLE;
-            } else if (object.isTurnStart) {
+            } else if (!WAIT_TURN_SYSTEM_COEXISTS && object.isTurnStart) {
+                color = ColorValue.KEYWORD;
+            } else if (WAIT_TURN_SYSTEM_COEXISTS && object.isLatest) {
                 color = ColorValue.KEYWORD;
             } else {
                 color = ColorValue.DEFAULT;
