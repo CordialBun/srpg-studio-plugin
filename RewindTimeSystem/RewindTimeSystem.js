@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-時戻しシステム Ver.1.30
+時戻しシステム Ver.1.40
 
 
 【概要】
@@ -50,6 +50,9 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
                     巻き戻し画面の確認ウィンドウに指カーソルが表示されない不具合を修正。
                     ボーナスの巻き戻しが正常に動作しない不具合を修正。
                     透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
+Ver.1.40 2024/11/09 ウェイトターンシステムとの併用に対応。
+                    ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様変更。
+                    時戻し画面にユニットのキャラチップを表示する機能を追加。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -112,6 +115,9 @@ var REWIND_TITLE_RAW_LIMIT = 10;
 // 時戻し画面表示中のBGM音量の割合
 // 元の音量の50%にする場合は0.5、120%にする場合は1.2、という風に設定する
 var MUSIC_VOLUME_RATIO = 0.5;
+
+// 時戻し画面にキャラチップを表示する場合はtrue、表示しない場合はfalse
+var DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW = true;
 
 // レコードの種類
 var RecordType = {
@@ -1159,6 +1165,10 @@ var RewindTimeManager = {
                 if (typeof atCount === "number") {
                     record.atCount = atCount;
                 }
+
+                if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
+                    record.unitId = atUnit.getId();
+                }
             } else {
                 record.unitName = "";
             }
@@ -1171,6 +1181,10 @@ var RewindTimeManager = {
 
             if (recordType !== RecordType.TURN_START && unit !== null) {
                 record.unitName = unit.getName();
+
+                if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
+                    record.unitId = unit.getId();
+                }
             } else {
                 record.unitName = "";
             }
@@ -2483,7 +2497,7 @@ var RewindTimeManager = {
     },
 
     getRecordTitleArray: function () {
-        var i, count, record, recordType, actionType, unitName, text, recordTitle, placeCommandName, talkCommandName;
+        var i, count, record, recordType, actionType, unitName, unitId, unit, text, recordTitle, placeCommandName, talkCommandName;
         var recordTitleArray = [];
         var recordArray = this._recordArray;
         var recordTitleString = WAIT_TURN_SYSTEM_COEXISTS ? WaitTurnRecordTitleString : RecordTitleString;
@@ -2498,6 +2512,7 @@ var RewindTimeManager = {
             placeCommandName = this.getPlaceCommandName();
             talkCommandName = this.getTalkCommandName();
             unitName = record.unitName;
+            unitId = record.unitId;
 
             if (recordType === RecordType.UNIT_PLACECOMMAND) {
                 text = unitName + placeCommandRecordTitleString[placeCommandName];
@@ -2517,13 +2532,25 @@ var RewindTimeManager = {
                 text += " -> " + recordTitleString[actionType];
             }
 
+            if (typeof unitId === "number" && this._unitDict[unitId] !== undefined) {
+                unit = this._unitDict[unitId];
+                root.log("name:" + unit.getName());
+            } else {
+                unit = null;
+            }
+
             recordTitle = {
-                title: text,
+                _title: text,
+                _unit: unit,
                 isTurnStart: recordType === RecordType.TURN_START,
                 isLatest: i === count - 1,
 
                 getTitle: function () {
-                    return this.title;
+                    return this._title;
+                },
+
+                getUnit: function () {
+                    return this._unit;
                 }
             };
 
@@ -4459,6 +4486,11 @@ var GetNumberTokenStateType = {
                 color = ColorValue.DEFAULT;
             }
 
+            if (object.getUnit() !== null) {
+                UnitRenderer.drawDefaultUnit(object.getUnit(), x, y - 4, null);
+                x += 32;
+            }
+
             TextRenderer.drawKeywordText(x, y, object.getTitle(), -1, color, font);
         },
 
@@ -4478,18 +4510,26 @@ var GetNumberTokenStateType = {
         },
 
         calculateObjectWidth: function () {
-            var i, text;
+            var i, object, text, unit, width;
             var textui = this.getParentTextUI();
             var font = textui.getFont();
-            var width = 140;
+            var maxWidth = 140;
             var count = this.getObjectCount();
 
             for (i = 0; i < count; i++) {
-                text = this.getObjectFromIndex(i).getTitle();
-                width = Math.max(width, TextRenderer.getTextWidth(text, font));
+                object = this.getObjectFromIndex(i);
+                text = object.getTitle();
+                unit = object.getUnit();
+                width = TextRenderer.getTextWidth(text, font);
+
+                if (unit !== null) {
+                    width += 32;
+                }
+
+                maxWidth = Math.max(maxWidth, width);
             }
 
-            this._objectWidth = width;
+            this._objectWidth = maxWidth;
         },
 
         getObjectWidth: function () {
@@ -4497,7 +4537,11 @@ var GetNumberTokenStateType = {
         },
 
         getObjectHeight: function () {
-            return 30;
+            if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
+                return 32;
+            } else {
+                return 30;
+            }
         }
     });
 
