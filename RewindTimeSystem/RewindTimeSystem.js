@@ -65,8 +65,7 @@ var WAIT_TURN_SYSTEM_COEXISTS = false;
 
 // 時戻しコマンドの名称
 var REWIND_COMMAND_NAME = "時戻し";
-// 時戻しコマンドを上から何番目に表示するか
-// 0が一番上
+// 時戻しコマンドを上から何番目に表示するか(0が一番上)
 var REWIND_COMMAND_INDEX = 0;
 
 // 各難易度の1マップあたりの時戻しの上限回数
@@ -85,7 +84,7 @@ var REWIND_CANCEL_QUESTION_MESSAGE = "時戻しを使わないと敗北し、\n�
 // 時戻しの残り回数を表す文字列
 var REMAIN_REWIND_COUNT_TEXT = "残り回数";
 // 時戻しの残り回数が無制限のときに数値の代わりに表示する文字列
-var REMAIN_COUNT_LIMITLESS = "∞";
+var REMAIN_COUNT_LIMITLESS_TEXT = "∞";
 
 // 時戻しコマンド表示のグローバルスイッチID
 var IS_REWIND_COMMAND_DISPLAYABLE_SWITCH_ID = 0;
@@ -97,24 +96,24 @@ var APPEND_RECORD_SWITCH_ID = 2;
 var IS_GAME_OVER_SWITCH_ID = 3;
 
 // マップのカスパラを巻き戻す場合はtrue、巻き戻さない場合はfalse
-var IS_ALLOWED_REWIND_MAP_CUSTOM = true;
+var IS_REWINDING_MAP_CUSTOM_ALLOWED = true;
 // ユニットのカスパラを巻き戻す場合はtrue、巻き戻さない場合はfalse
-var IS_ALLOWED_REWIND_UNIT_CUSTOM = true;
+var IS_REWINDING_UNIT_CUSTOM_ALLOWED = true;
 
 // 時戻し画面のレコード一覧ウィンドウのx座標
-var REWIND_TITLE_WINDOW_X = 40;
+var REWIND_TITLE_WINDOW_POS_X = 40;
 // 時戻し画面のレコード一覧ウィンドウのy座標
-var REWIND_TITLE_WINDOW_Y = 40;
+var REWIND_TITLE_WINDOW_POS_Y = 40;
 // 時戻し画面の残り回数ウィンドウのx座標
-var REWIND_COUNT_WINDOW_X = 40;
+var REWIND_COUNT_WINDOW_POS_X = 40;
 // 時戻し画面の残り回数ウィンドウのy座標
-var REWIND_COUNT_WINDOW_Y = 400;
+var REWIND_COUNT_WINDOW_POS_Y = 400;
 
 // 時戻し画面に一度に表示するレコードの行数
 var REWIND_TITLE_RAW_LIMIT = 10;
 // 時戻し画面表示中のBGM音量の割合
 // 元の音量の50%にする場合は0.5、120%にする場合は1.2、という風に設定する
-var MUSIC_VOLUME_RATIO = 0.5;
+var MUSIC_VOLUME_RATIO_IN_REWIND_SCREEN = 0.5;
 
 // 時戻し画面にキャラチップを表示する場合はtrue、表示しない場合はfalse
 var DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW = true;
@@ -1247,7 +1246,7 @@ var RewindTimeManager = {
         this.createShopRecord(record, newLatestRecord, latestRecord.shopDataParamArray, isFirstRecord, curSession);
         this.createCurSeedRecord(record, newLatestRecord, latestRecord.curSeed, isFirstRecord);
 
-        if (IS_ALLOWED_REWIND_MAP_CUSTOM) {
+        if (IS_REWINDING_MAP_CUSTOM_ALLOWED) {
             this.createMapCustomRecord(record, newLatestRecord, latestRecord.custom, isFirstRecord, curSession);
         }
     },
@@ -1316,7 +1315,7 @@ var RewindTimeManager = {
         this.createUnitIsActionStopRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.isActionStop, isFirstRecord);
         this.createUnitIsSyncopeRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.isSyncope, isFirstRecord);
 
-        if (IS_ALLOWED_REWIND_UNIT_CUSTOM) {
+        if (IS_REWINDING_UNIT_CUSTOM_ALLOWED) {
             this.createUnitCustomRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.custom, isFirstRecord);
         }
     },
@@ -2442,29 +2441,6 @@ var RewindTimeManager = {
         this._unitDict[unit.getId()] = unit;
     },
 
-    addUnitById: function (unitType, unitGroup, id) {
-        var i, count, unit, unitList;
-        var realId = id + 65536 * unitGroup;
-
-        if (unitType === UnitType.PLAYER) {
-            unitList = PlayerList.getMainList();
-        } else if (unitType === UnitType.ENEMY) {
-            unitList = EnemyList.getMainList();
-        } else if (unitType === UnitType.ALLY) {
-            unitList = AllyList.getMainList();
-        }
-
-        count = unitList.getCount();
-        for (i = 0; i < count; i++) {
-            unit = unitList.getData(i);
-
-            if (unit.getId() === realId) {
-                this._unitDict[realId] = unit;
-                break;
-            }
-        }
-    },
-
     addBeforeChangedMapChip: function (latestHandleParam, isLayer) {
         var x, y, key;
         var beforeChangedMapChipDict;
@@ -2534,7 +2510,6 @@ var RewindTimeManager = {
 
             if (typeof unitId === "number" && this._unitDict[unitId] !== undefined) {
                 unit = this._unitDict[unitId];
-                root.log("name:" + unit.getName());
             } else {
                 unit = null;
             }
@@ -2542,8 +2517,8 @@ var RewindTimeManager = {
             recordTitle = {
                 _title: text,
                 _unit: unit,
-                isTurnStart: recordType === RecordType.TURN_START,
-                isLatest: i === count - 1,
+                _isTurnStart: recordType === RecordType.TURN_START,
+                _isLatest: i === count - 1,
 
                 getTitle: function () {
                     return this._title;
@@ -2551,6 +2526,14 @@ var RewindTimeManager = {
 
                 getUnit: function () {
                     return this._unit;
+                },
+
+                isTurnStart: function () {
+                    return this._isTurnStart;
+                },
+
+                isLatest: function () {
+                    return this._isLatest;
                 }
             };
 
@@ -4184,7 +4167,7 @@ var GetNumberTokenStateType = {
             if (this._isGameOverRewind) {
                 this._mediaManager.setMusicVolume(0);
             } else {
-                this._mediaManager.setMusicVolume(Math.floor(this._prevMusicVolume * MUSIC_VOLUME_RATIO));
+                this._mediaManager.setMusicVolume(Math.floor(this._prevMusicVolume * MUSIC_VOLUME_RATIO_IN_REWIND_SCREEN));
             }
 
             this.changeCycleMode(RewindTimeMode.REWINDSELECT);
@@ -4292,8 +4275,8 @@ var GetNumberTokenStateType = {
             var x = LayoutControl.getCenterX(-1, this._rewindQuestionWindow.getWindowWidth());
             var y = LayoutControl.getCenterY(-1, this._rewindQuestionWindow.getWindowHeight());
 
-            this._rewindTitleWindow.drawWindow(REWIND_TITLE_WINDOW_X, REWIND_TITLE_WINDOW_Y);
-            this._rewindCountWindow.drawWindow(REWIND_COUNT_WINDOW_X, REWIND_COUNT_WINDOW_Y);
+            this._rewindTitleWindow.drawWindow(REWIND_TITLE_WINDOW_POS_X, REWIND_TITLE_WINDOW_POS_Y);
+            this._rewindCountWindow.drawWindow(REWIND_COUNT_WINDOW_POS_X, REWIND_COUNT_WINDOW_POS_Y);
 
             if (this.getCycleMode() === RewindTimeMode.REWINDQUESTION) {
                 this._rewindQuestionWindow.drawWindow(x, y);
@@ -4413,7 +4396,7 @@ var GetNumberTokenStateType = {
             y -= 5;
 
             if (this._remainRewindCount < 0) {
-                TextRenderer.drawText(x, y + 5, REMAIN_COUNT_LIMITLESS, -1, ColorValue.DEFAULT, font);
+                TextRenderer.drawText(x, y + 5, REMAIN_COUNT_LIMITLESS_TEXT, -1, ColorValue.DEFAULT, font);
             } else {
                 NumberRenderer.drawNumber(x, y, this._remainRewindCount);
             }
@@ -4478,9 +4461,9 @@ var GetNumberTokenStateType = {
 
             if (this._isGameOverRewind && index === count - 1) {
                 color = ColorValue.DISABLE;
-            } else if (!WAIT_TURN_SYSTEM_COEXISTS && object.isTurnStart) {
+            } else if (!WAIT_TURN_SYSTEM_COEXISTS && object.isTurnStart()) {
                 color = ColorValue.KEYWORD;
-            } else if (WAIT_TURN_SYSTEM_COEXISTS && object.isLatest) {
+            } else if (WAIT_TURN_SYSTEM_COEXISTS && object.isLatest()) {
                 color = ColorValue.KEYWORD;
             } else {
                 color = ColorValue.DEFAULT;
