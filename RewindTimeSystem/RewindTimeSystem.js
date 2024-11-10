@@ -768,7 +768,7 @@ var RewindTimeManager = {
     },
 
     rewindTurnStateList: function (unit, turnStateArray) {
-        var i, count, turnStateParam, state, turnState;
+        var i, count, key, turnStateParam, state, turnState, copiedCustom;
         var dataEditor = root.getDataEditor();
         var turnStateList = unit.getTurnStateList();
         dataEditor.deleteAllTurnStateData(turnStateList);
@@ -780,6 +780,11 @@ var RewindTimeManager = {
             turnState = dataEditor.addTurnStateData(turnStateList, state);
             turnState.setTurn(turnStateParam.turn);
             turnState.setRemovalCount(turnStateParam.removalCount);
+            copiedCustom = JSONParser.deepCopy(turnStateParam.custom);
+
+            for (key in copiedCustom) {
+                turnState.custom[key] = copiedCustom[key];
+            }
         }
     },
 
@@ -1672,10 +1677,12 @@ var RewindTimeManager = {
             turnStateParam.stateId = turnState.getState().getId();
             turnStateParam.turn = turnState.getTurn();
             turnStateParam.removalCount = turnState.getRemovalCount();
+            turnStateParam.custom = JSONParser.deepCopy(turnState.custom);
             newLatestTurnStateParam = {};
             newLatestTurnStateParam.stateId = turnStateParam.stateId;
             newLatestTurnStateParam.turn = turnStateParam.turn;
             newLatestTurnStateParam.removalCount = turnStateParam.removalCount;
+            newLatestTurnStateParam.custom = JSONParser.deepCopy(turnState.custom);
 
             turnStateArray.push(turnStateParam);
             newLatestTurnStateArray.push(newLatestTurnStateParam);
