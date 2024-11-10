@@ -12,163 +12,9 @@
 本プラグインを導入することでウェイトターンシステムを実現できます。
 
 
-【仕様】
-
-[アタックターン(AT)がまわってくる仕組み]
-
-全てのユニットは現在WT値と基本WT値を持っており、マップ開始時点では現在WT値＝基本WT値である。
-
-まず全てのユニットの現在WT値が同じ速度で減少していき、最初に0になったユニットに手番がまわってくる。
-この手番のことをアタックターン(AT)と呼ぶ。
-複数のユニットの現在WT値が同時に0になった場合、自軍ユニット→敵軍ユニット→同盟軍ユニットの順に優先される。
-所属も同じ場合はIDが小さい方が優先される。
-
-ATのユニットが行動終了すると、そのユニットの現在WT値に新たにWT値が加算される。
-その後、再び全てのユニットの現在WT値が減少していき、最初に0になったユニットにATがまわってくる。
-これをマップの勝利条件や敗北条件が満たされるまで繰り返す。
-
-現在WT値の減算は瞬時に行われるため、プレイヤーの目にはATユニットが行動終了したら
-即座に次のユニットにATがまわっているように見える。
-
-
-[WTの計算式]
-
-基本WT値 = クラスのWT値 - ユニットの速さ + 所持アイテムの重量の合計 または 装備中の武器の重量※
-
-行動終了後に加算されるWT値 = 基本WT値
-
-※設定項目のIS_ALL_BELONGINGS_APPLICABLEで変更可。
-
-
-[行動順リスト]
-
-ユニットの行動順は画面右側か画面下側(いずれかを選択可能)に常に表示される。
-これを行動順リストと呼ぶ。
-
-行動順リストには、本プラグイン内で設定した数(初期設定では15)のユニットが行動順に表示される。
-
-行動順リストはATユニットが行動終了すると更新されるほか、ATユニットのコマンド選択中にも
-「このまま行動終了すると次の行動順はどうなるか」の予測が常に反映される。
-
-行動順リストはマップチップ2列分のスペースを占有する。
-このスペースにはマップカーソルは侵入できない(キーボード操作もマウス操作も同様)
-
-ただしユニットの侵入可否は本プラグインでは制御していないので、
-マップ作成時に適宜、該当マスを侵入不可にする必要がある。
-
-
-[ターン開始時の演出]
-
-マップ開始時に、リソース使用箇所の「UI」→「自軍ターン」の画像が一度だけ表示される。
-以降は「自軍ターン」「敵軍ターン」「同盟軍ターン」のいずれも表示されない。
-
-マップ開始を示す演出を入れたい場合は上記の「自軍ターン」の画像を変更する。
-
-
-[合計WT]
-
-ウェイトターンシステムにはターン数の概念が無いため、
-目標確認画面やセーブ/ロード画面など、ターン数を表示している箇所には代わりにTOTAL WTという項目を表示している(項目名は変更可)。
-これはマップ開始から消費されたWT値の合計を表している。
-
-
-[環境設定]
-
-本プラグインの処理の都合上、環境設定の以下の項目は変更不可となっており、設定画面にも表示されない。
-「オートターンエンド」
-「敵ターンスキップ」
-
-
-
 【使い方】
-
-[必須]
-
-1.このファイルをプロジェクトフォルダのPluginフォルダ内に保存する。
-
-2.WT値を設定したいクラスに以下のようにカスタムパラメータを設定する。
-
-{
-    classWT: クラスのWT値
-}
-
-例)クラスのWT値を120にしたい場合
-{
-    classWT: 120
-}
-
-3.任意の武器とアイテムに重さを設定する。
-
-4.マップのオープニングイベントの最後にイベントコマンド「スクリプトの実行」を作成し、
-種類「コード実行」を選び、以下のテキストをプロパティ欄に貼り付ける。
-
-WaitTurnOrderManager.initialize();
-
-
-[任意]
-
-5. このファイルの206～227行目の設定項目を必要に応じて変更する。
-
-6.マップの右端2列分または下端2列分を侵入不可能マスにする。
-
-7.リソース使用箇所の「UI」→「自軍ターン」の画像を変更する。
-
-
-
-[イベントの実行条件について]
-
-本プラグインを導入すると、イベントの実行条件にターン数を指定することができなくなります。
-
-そのため、ターン経過を判定する代替手段として、
-以下のテキストをイベントの実行条件の「スクリプト」に貼り付けることで
-「指定したユニットにATが何回まわってきたか」で条件判定できるようにしています。
-
-WaitTurnOrderManager.getATCount(ユニットのID, ユニットの所属) === ATがまわってきた回数
-
-ユニットの所属は、以下の分類から該当するUnitGroup.～を選んでください。
-
-プレイヤー→     UnitGroup.PLAYER
-敵→             UnitGroup.ENEMY
-敵イベント→     UnitGroup.ENEMYEVENT
-同盟→           UnitGroup.ALLY
-同盟イベント→   UnitGroup.ALLYEVENT
-援軍→           UnitGroup.REINFORCE
-ゲスト→         UnitGroup.GUEST
-ゲストイベント→ UnitGroup.GUESTEVENT
-ブックマーク→   UnitGroup.BOOKMARK
-
-
-例)敵のID:5のユニットに2回目のATがまわってきたとき
-
-WaitTurnOrderManager.getATCount(5, UnitGroup.ENEMY) === 2
-
-
-"==="の部分は、判定したい条件に応じて以下のように変更することもできます。
-
-<   未満
-<=  以下
->=  以上
->   より多い
-
-例)プレイヤーのID:3のユニットにATがまわってきた回数が5回以上のとき
-
-WaitTurnOrderManager.getATCount(3, UnitGroup.PLAYER) >= 5
-
-
-また、以下のテキストをイベントの実行条件の「スクリプト」に貼り付けることで
-「現在のマップが開始してから経過したWT値の合計」で条件判定できます。
-
-WaitTurnOrderManager.getMapTotalWT()
-
-例)合計WT値が1000以上のとき
-
-WaitTurnOrderManager.getMapTotalWT() >= 1000
-
-
-上記の WaitTurnOrderManager.getMapTotalWT() は戻り値として合計WT値を返すので、
-スクリプトの実行で変数に入れることもできます。
-これを利用して「ゲーム開始からゲームクリアまでに経過した合計WT値をカウントする」などの応用も可能です。
-
+下記のURLからマニュアルを参照してください。
+https://github.com/CordialBun/srpg-studio-plugin/tree/master/WaitTurnSystem#readme
 
 
 【作者】
@@ -200,7 +46,8 @@ Ver.1.20 2024/11/04 行動終了後に加算されるWT値の計算式を変更�
                     出撃準備画面でアイテム交換やストック交換をするとWTが正常に反映されない不具合を修正。
                     自軍ユニットが待機後、次のATユニットが自軍ユニットのときに効果音が二重に再生されてしまう不具合を修正。
 Ver.1.21 2024/11/04 WT値が同じユニットがいるときにエラー落ちする不具合を修正。
-Ver.1.22 2024/11/10 ユニットの登場や援軍で増えたユニットが行動順リストに登録されない不具合を修正。
+Ver.1.22 2024/11/11 マニュアルを作成。
+                    ユニットの登場や援軍で増えたユニットが行動順リストに正常に反映されない不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -223,10 +70,8 @@ var WaitTurnOrderParam = {
     ORDER_LIST_UNIT_NUM: 15 // 行動順リストのユニット表示数
 };
 
-// 行動順リストでATユニットの横に表示する文字列
-StringTable.Signal_AT = "AT";
-// 目標確認画面やセーブ・ロード画面で表示する合計WTの項目名
-StringTable.Signal_TotalWT = "TOTAL WT";
+// 目標確認画面やセーブ・ロード画面で表示する経過WTの項目名
+StringTable.Signal_TotalWT = "経過WT";
 
 /*-----------------------------------------------------------------------------------------------------------------
     行動順リストを管理するオブジェクト
@@ -348,7 +193,7 @@ var WaitTurnOrderManager = {
             }
 
             if (i > 0) {
-                unit.custom.isAT = false;
+                delete unit.custom.isAT;
             }
 
             defaultWT = this.calcUnitWT(unit);
@@ -521,9 +366,7 @@ var WaitTurnOrderManager = {
 
         unit.custom.curWT = this.calcUnitWT(unit);
         unit.custom.orderNum = 0;
-        unit.custom.isAT = false;
         unit.custom.atCount = 0;
-        unit.custom.isPredicting = false;
     },
 
     // ユニットの基本WT値を計算する
@@ -560,7 +403,7 @@ var WaitTurnOrderManager = {
 
         defaultWT = classWT - spd + totalWeight;
 
-        return defaultWT;
+        return Math.max(defaultWT, 0);
     },
 
     // 指定したIDのユニットのatCountを取得する
@@ -641,7 +484,7 @@ var WaitTurnOrderManager = {
             return;
         }
 
-        unit.custom.isPredicting = false;
+        delete unit.custom.isPredicting;
     }
 };
 
@@ -1070,25 +913,6 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        自軍以外のユニットの移動と行動のチェックをする
-    *----------------------------------------------------------------------------------------------------------------*/
-    EnemyTurn._moveAutoAction = function () {
-        var unit;
-
-        // this._autoActionIndexで識別されている行動を終えたか調べる
-        if (this._autoActionArray[this._autoActionIndex].moveAutoAction() !== MoveResult.CONTINUE) {
-            unit = this.getOrderUnit();
-            unit.custom.isPredicting = true;
-
-            if (!this._countAutoActionIndex()) {
-                this._changeIdleMode(EnemyTurnMode.TOP, this._getIdleValue());
-            }
-        }
-
-        return MoveResult.CONTINUE;
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
         フェイズ終了時にATユニットの待機状態を解除し、行動順リストを更新する
     *----------------------------------------------------------------------------------------------------------------*/
     TurnChangeEnd._checkActorList = function () {
@@ -1131,9 +955,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニット登場時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias008 = ScriptCall_AppearEventUnit;
+    var alias000 = ScriptCall_AppearEventUnit;
     ScriptCall_AppearEventUnit = function (unit) {
-        alias008.call(this, unit);
+        alias000.call(this, unit);
         var sceneType = root.getBaseScene();
 
         if (sceneType === SceneType.BATTLESETUP || sceneType === SceneType.FREE) {
@@ -1145,9 +969,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias009 = ReinforcementChecker._appearUnit;
+    var alias001 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias009.call(this, pageData, x, y);
+        var unit = alias001.call(this, pageData, x, y);
 
         if (unit !== null) {
             WaitTurnOrderManager.initUnitParam(unit);
@@ -1164,9 +988,9 @@ var WaitTurnOrderManager = {
     var cursorPic = null;
     var iconPic = null;
 
-    var alias000 = SetupControl.setup;
+    var alias002 = SetupControl.setup;
     SetupControl.setup = function () {
-        alias000.call(this);
+        alias002.call(this);
         var baseList;
 
         if (graphicsManager == null) {
@@ -1261,7 +1085,7 @@ var WaitTurnOrderManager = {
                 // ユニットコマンド選択中はMapParts.OrderCursorによる強調表示がなくなるので
                 // こっちで処理する
                 isPredicting = atUnit.custom.isPredicting;
-                if (typeof isPredicting !== "boolean" || isPredicting) {
+                if (typeof isPredicting === "boolean" || isPredicting) {
                     if (unit.getId() === atUnit.getId() && i > 0) {
                         if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
                             cursorPic.drawParts(x, y, 0, 0, 32, 32);
@@ -1350,7 +1174,7 @@ var WaitTurnOrderManager = {
                         cursorPic.drawParts(x, y, 0, 0, 32, 32);
                     } else {
                         cursorPic.setDegree(90);
-                        cursorPic.drawParts(x - 3, y, 0, 0, 32, 32);
+                        cursorPic.drawParts(x - 3, y - 10, 0, 0, 32, 32);
                     }
                 }
 
@@ -1386,9 +1210,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         新たに作成したMapParts.OrderCursorをMapPartsCollectionに追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias001 = MapPartsCollection._configureMapParts;
+    var alias003 = MapPartsCollection._configureMapParts;
     MapPartsCollection._configureMapParts = function (groupArray) {
-        alias001.call(this, groupArray);
+        alias003.call(this, groupArray);
 
         groupArray.appendObject(MapParts.OrderCursor);
     };
@@ -1396,9 +1220,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         MapLayerクラスに_mapPartsArrayを追加し、MapParts.WTOrderを入れる
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias002 = MapLayer.prepareMapLayer;
+    var alias004 = MapLayer.prepareMapLayer;
     MapLayer.prepareMapLayer = function () {
-        alias002.call(this, MapLayer.prepareMapLayer);
+        alias004.call(this, MapLayer.prepareMapLayer);
 
         this._mapPartsArray = [];
         this._configureMapParts(this._mapPartsArray);
@@ -1420,9 +1244,9 @@ var WaitTurnOrderManager = {
         }
     };
 
-    var alias003 = MapLayer.drawUnitLayer;
+    var alias005 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias003.call(this);
+        alias005.call(this);
 
         this.drawUILayer();
     };
@@ -1430,9 +1254,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘時に毎回UIを描画することのないよう、キャッシュに描画しておく
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias004 = ClipingBattleContainer._createMapCache;
+    var alias006 = ClipingBattleContainer._createMapCache;
     ClipingBattleContainer._createMapCache = function () {
-        var cache = alias004.call(this);
+        var cache = alias006.call(this);
 
         MapLayer.drawUILayer();
 
@@ -1442,9 +1266,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニットメニューにWT値を表示する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias005 = UnitMenuTopWindow.drawWindowContent;
+    var alias007 = UnitMenuTopWindow.drawWindowContent;
     UnitMenuTopWindow.drawWindowContent = function (x, y) {
-        alias005.call(this, x, y);
+        alias007.call(this, x, y);
 
         this._drawUnitWT(x, y);
     };
@@ -1512,9 +1336,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップ上のユニットのキャラチップ上に行動順を描画する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias006 = MapLayer.drawUnitLayer;
+    var alias008 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias006.call(this);
+        alias008.call(this);
 
         this.drawWaitTurnOrderNumber();
     };
@@ -1720,9 +1544,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias007 = ConfigWindow._configureConfigItem;
+    var alias009 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias007.call(this, groupArray);
+        alias009.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
