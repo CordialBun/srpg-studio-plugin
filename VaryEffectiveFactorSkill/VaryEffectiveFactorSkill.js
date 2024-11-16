@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-スキル「特効耐性」 Ver.1.00
+スキル「特効耐性」 Ver.1.10
 
 
 【概要】
@@ -25,6 +25,9 @@ XXには任意の数値を入力してください(被特効時にこの数値�
     arbFactor: XX
 }
 
+プラグイン「特効係数を攻撃力ではなく武器の威力に適用する」と併用する場合、
+設定項目のAPPLY_EFFECTIVENESS_TO_WEAPON_POWER_COEXISTをtrueに変更してください。
+
 
 【作者】
 さんごぱん(https://twitter.com/CordialBun)
@@ -40,24 +43,35 @@ SRPG Studio version:1.302
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.0  2024/10/13  初版
+Ver.1.00 2024/10/13 初版
+Ver.1.10 2024/11/16 プラグイン「特効係数を攻撃力ではなく武器の威力に適用する」との併用に対応。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
 
 (function () {
-    DamageCalculator.calculateAttackPower = function (active, passive, weapon, isCritical, totalStatus, trueHitValue) {
-        var pow =
-            AbilityCalculator.getPower(active, weapon) +
-            CompatibleCalculator.getPower(active, passive, weapon) +
-            SupportCalculator.getPower(totalStatus);
+    /*-----------------------------------------------------------------------------------------------------------------
+        設定項目
+    *----------------------------------------------------------------------------------------------------------------*/
+    // プラグイン「特効係数を攻撃力ではなく武器の威力に適用する」と併用する場合はtrue、しない場合はfalse
+    var APPLY_EFFECTIVENESS_TO_WEAPON_POWER_COEXIST = false;
 
-        if (this.isEffective(active, passive, weapon, isCritical, trueHitValue)) {
-            pow = Math.floor(pow * this.getEffectiveFactor(passive));
-        }
+    // 設定項目はここまで
 
-        return pow;
-    };
+    if (!APPLY_EFFECTIVENESS_TO_WEAPON_POWER_COEXIST) {
+        DamageCalculator.calculateAttackPower = function (active, passive, weapon, isCritical, totalStatus, trueHitValue) {
+            var pow =
+                AbilityCalculator.getPower(active, weapon) +
+                CompatibleCalculator.getPower(active, passive, weapon) +
+                SupportCalculator.getPower(totalStatus);
+
+            if (this.isEffective(active, passive, weapon, isCritical, trueHitValue)) {
+                pow = Math.floor(pow * this.getEffectiveFactor(passive));
+            }
+
+            return pow;
+        };
+    }
 
     DamageCalculator.getEffectiveFactor = function (passive) {
         var effectiveFactor;
