@@ -173,7 +173,7 @@ ChargeWeapon.js をプロジェクトの Plugin フォルダ配下に保存し�
 
 <br>
 
-WaitTurnSystem.js 内の設定項目を必要に応じて変更してください。
+ChargeWeapon.js 内の設定項目を必要に応じて変更してください。
 
 <br>
 
