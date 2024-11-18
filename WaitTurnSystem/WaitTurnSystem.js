@@ -50,6 +50,7 @@ Ver.1.22 2024/11/11 マニュアルを作成。
                     ユニットの登場や援軍で増えたユニットが行動順リストに正常に反映されない不具合を修正。
 Ver.2.00 2024/11/18 拡張機能「チャージ武器」を追加。
                     ユニットの移動範囲や攻撃範囲、危険範囲の描画が行動順リストに重ならないよう仕様を変更。
+                    ユニットが画面右端または画面下端付近にいるとき、ユニットコマンドが行動順リストと重なってしまう不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -1635,6 +1636,29 @@ var WaitTurnOrderManager = {
         } else {
             return yBase;
         }
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        ユニットコマンドの表示位置を調整する
+    *----------------------------------------------------------------------------------------------------------------*/
+    LayoutControl._getNormalizeX = function (x, width, dx) {
+        var maxWidth = root.getGameAreaWidth();
+
+        if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+            maxWidth -= GraphicsFormat.MAPCHIP_WIDTH * 2;
+        }
+
+        return this._getNormalizeValue(x, width, maxWidth, dx);
+    };
+
+    LayoutControl._getNormalizeY = function (y, height, dy) {
+        var maxHeight = root.getGameAreaHeight();
+
+        if (!IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+            maxHeight -= GraphicsFormat.MAPCHIP_HEIGHT * 2;
+        }
+
+        return this._getNormalizeValue(y, height, maxHeight, dy);
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
