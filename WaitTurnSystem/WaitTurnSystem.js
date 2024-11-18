@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「ウェイトターンシステム」 Ver.1.22
+「ウェイトターンシステム」 Ver.2.00
 
 【概要】
 ウェイトターンシステムは、ユニットの速さや所持アイテムの重量などから算出される待機時間(ウェイトターン)によって
@@ -48,6 +48,8 @@ Ver.1.20 2024/11/04 行動終了後に加算されるWT値の計算式を変更�
 Ver.1.21 2024/11/04 WT値が同じユニットがいるときにエラー落ちする不具合を修正。
 Ver.1.22 2024/11/11 マニュアルを作成。
                     ユニットの登場や援軍で増えたユニットが行動順リストに正常に反映されない不具合を修正。
+Ver.2.00 2024/11/18 拡張機能「チャージ武器」を追加。
+                    ユニットの移動範囲や攻撃範囲、危険範囲の描画が行動順リストに重ならないよう仕様を変更。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -1539,6 +1541,55 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        マップの右端2列または下端2列にユニットの移動範囲や攻撃範囲を示すパネルを表示しないようにする
+    *----------------------------------------------------------------------------------------------------------------*/
+    MapChipLight.setIndexArray = function (indexArray) {
+        this._indexArray = CDB_rebuildIndexArray(indexArray);
+    };
+
+    var alias010 = MarkingPanel.updateMarkingPanel;
+    MarkingPanel.updateMarkingPanel = function () {
+        alias010.call(this);
+        this._indexArray = CDB_rebuildIndexArray(this._indexArray);
+        this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
+    };
+
+    var alias011 = MarkingPanel.updateMarkingPanelFromUnit;
+    MarkingPanel.updateMarkingPanelFromUnit = function (unit) {
+        alias011.call(this, unit);
+        this._indexArray = CDB_rebuildIndexArray(this._indexArray);
+        this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
+    };
+
+    var CDB_rebuildIndexArray = function (indexArray) {
+        var i, index, mapInfo, width, height, count, newIndexArray;
+
+        if (indexArray === null) {
+            return indexArray;
+        }
+
+        mapInfo = root.getCurrentSession().getCurrentMapInfo();
+        width = mapInfo.getMapWidth();
+        height = mapInfo.getMapHeight();
+        count = indexArray.length;
+        newIndexArray = [];
+
+        for (i = 0; i < count; i++) {
+            index = indexArray[i];
+
+            if (IS_WT_ORDER_LIST_LOCATED_RIGHT && Math.floor(index % width) >= width - 2) {
+                continue;
+            } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && Math.floor(index / width) >= height - 2) {
+                continue;
+            }
+
+            newIndexArray.push(index);
+        }
+
+        return newIndexArray;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         ユニット情報の表示位置を調整する
     *----------------------------------------------------------------------------------------------------------------*/
     MapParts.UnitInfo._getPositionY = function (unit) {
@@ -1589,9 +1640,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias010 = ConfigWindow._configureConfigItem;
+    var alias012 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias010.call(this, groupArray);
+        alias012.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
