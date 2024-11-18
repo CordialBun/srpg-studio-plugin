@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「ウェイトターンシステム」 Ver.1.22
+「ウェイトターンシステム」 Ver.2.00
 
 【概要】
 ウェイトターンシステムは、ユニットの速さや所持アイテムの重量などから算出される待機時間(ウェイトターン)によって
@@ -48,6 +48,9 @@ Ver.1.20 2024/11/04 行動終了後に加算されるWT値の計算式を変更�
 Ver.1.21 2024/11/04 WT値が同じユニットがいるときにエラー落ちする不具合を修正。
 Ver.1.22 2024/11/11 マニュアルを作成。
                     ユニットの登場や援軍で増えたユニットが行動順リストに正常に反映されない不具合を修正。
+Ver.2.00 2024/11/18 拡張機能「チャージ武器」を追加。
+                    ユニットの移動範囲や攻撃範囲、危険範囲の描画が行動順リストに重ならないよう仕様を変更。
+                    ユニットが画面右端または画面下端付近にいるとき、ユニットコマンドが行動順リストと重なってしまう不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -176,11 +179,11 @@ var WaitTurnOrderManager = {
             atUnit.custom.atCount += 1;
             totalWT = this.getMapTotalWT();
 
-            if (totalWT == null) {
-                this.setMapTotalWT(0);
-            } else {
-                this.setMapTotalWT(totalWT + atCurWT);
+            if (totalWT < 0) {
+                totalWT = 0;
             }
+
+            this.setMapTotalWT(totalWT + atCurWT);
         }
 
         count = this._unitList.length;
@@ -302,7 +305,7 @@ var WaitTurnOrderManager = {
                 isTop: i === 0
             });
 
-            sumWT += this.calcUnitWT(atUnit);
+            sumWT += i === 0 ? this.calcNextWT(atUnit) : this.calcUnitWT(unit);
         }
 
         predictOrderList = predictOrderList.sort(function (prevObj, nextObj) {
@@ -355,7 +358,7 @@ var WaitTurnOrderManager = {
             return;
         }
 
-        unit.custom.curWT = this.calcUnitWT(unit);
+        unit.custom.curWT = this.calcNextWT(unit);
     },
 
     // ユニットのカスパラを初期化する
@@ -367,6 +370,19 @@ var WaitTurnOrderManager = {
         unit.custom.curWT = this.calcUnitWT(unit);
         unit.custom.orderNum = 0;
         unit.custom.atCount = 0;
+    },
+
+    // 次に加算するWT値を計算する
+    calcNextWT: function (unit) {
+        var nextWT = this.calcUnitWT(unit);
+        var hasCharged = unit.custom.hasCharged;
+        var chargeWT = unit.custom.chargeWT;
+
+        if (typeof hasCharged === "boolean" && typeof chargeWT === "number" && hasCharged) {
+            return Math.max(chargeWT, 0);
+        }
+
+        return nextWT;
     },
 
     // ユニットの基本WT値を計算する
@@ -461,7 +477,7 @@ var WaitTurnOrderManager = {
         var curMapInfo = root.getCurrentSession().getCurrentMapInfo();
 
         if (curMapInfo == null || typeof curMapInfo.custom.totalWT !== "number") {
-            return null;
+            return -1;
         }
 
         return curMapInfo.custom.totalWT;
@@ -485,6 +501,7 @@ var WaitTurnOrderManager = {
         }
 
         delete unit.custom.isPredicting;
+        delete unit.custom.hasCharged;
     }
 };
 
@@ -503,25 +520,12 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         出撃準備画面でアイテム交換やストック交換を実行時、行動順リストを初期化する
     *----------------------------------------------------------------------------------------------------------------*/
+    var alias000 = ItemControl.updatePossessionItem;
     ItemControl.updatePossessionItem = function (unit) {
-        var scene = root.getCurrentScene();
-        var mhp = ParamBonus.getMhp(unit);
+        alias000.call(this, unit);
 
-        // シーンがFREEでもEVENTでもない場合は、常にHPは最大HPと一致する。
-        // この処理を忘れた場合は、アイテム交換やアイテム増減でHPが変化する。
-        if (scene !== SceneType.FREE && scene !== SceneType.EVENT) {
-            unit.setHp(mhp);
-        }
-
-        if (scene === SceneType.BATTLESETUP) {
+        if (root.getCurrentScene() === SceneType.BATTLESETUP) {
             WaitTurnOrderManager.initialize();
-        }
-
-        // HPは最大HPを超えてはならない
-        if (unit.getHp() > mhp) {
-            unit.setHp(mhp);
-        } else if (unit.getHp() < 1) {
-            unit.setHp(1);
         }
     };
 
@@ -894,22 +898,66 @@ var WaitTurnOrderManager = {
     *----------------------------------------------------------------------------------------------------------------*/
     UnitCommand.Wait.isWaitCommand = true;
 
-    UnitCommand._drawTitle = function () {
+    UnitCommand._moveTitle = function () {
+        var weapon, isCharging;
         var unit = this.getListCommandUnit();
-        var obj = this._commandScrollbar.getObject();
-        var curMapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
-        var x = this.getPositionX();
-        var y = this.getPositionY();
+        var mapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
+        var object = this._commandScrollbar.getObject();
+        var result = MoveResult.CONTINUE;
 
         unit.custom.isPredicting = true;
 
-        if (typeof obj.isWaitCommand === "boolean" && obj.isWaitCommand) {
-            curMapCustom.isWaitSelected = true;
+        if (typeof object.isChargeCommand === "boolean" && object.isChargeCommand) {
+            weapon = ItemControl.getEquippedWeapon(unit);
+
+            if (weapon !== null && typeof weapon.custom.chargeWT === "number") {
+                unit.custom.hasCharged = true;
+                unit.custom.chargeWT = weapon.custom.chargeWT;
+                unit.custom.chargeWeaponId = weapon.getId();
+                unit.custom.chargeStartMapTotalWT = WaitTurnOrderManager.getMapTotalWT();
+            }
         } else {
-            curMapCustom.isWaitSelected = false;
+            isCharging = unit.custom.isCharging;
+
+            if (typeof isCharging !== "boolean" || !isCharging) {
+                delete unit.custom.hasCharged;
+                delete unit.custom.chargeWT;
+                delete unit.custom.chargeWeaponId;
+                delete unit.custom.chargeStartMapTotalWT;
+            }
         }
 
-        this._commandScrollbar.drawScrollbar(x, y);
+        // 待機時に効果音が二重に再生されるのを防ぐためにフラグを立てる
+        if (typeof object.isWaitCommand === "boolean" && object.isWaitCommand) {
+            mapCustom.isWaitSelected = true;
+        } else {
+            delete mapCustom.isWaitSelected;
+        }
+
+        if (InputControl.isSelectAction()) {
+            if (object === null) {
+                return result;
+            }
+
+            object.openCommand();
+
+            this._playCommandSelectSound();
+            this.changeCycleMode(ListCommandManagerMode.OPEN);
+        } else if (InputControl.isCancelAction()) {
+            delete unit.custom.isPredicting;
+            delete unit.custom.hasCharged;
+            delete unit.custom.chargeWT;
+            delete unit.custom.chargeWeaponId;
+            delete unit.custom.chargeStartMapTotalWT;
+
+            this._playCommandCancelSound();
+            this._checkTracingScroll();
+            result = MoveResult.END;
+        } else {
+            this._commandScrollbar.moveScrollbarCursor();
+        }
+
+        return result;
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -955,9 +1003,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニット登場時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias000 = ScriptCall_AppearEventUnit;
+    var alias001 = ScriptCall_AppearEventUnit;
     ScriptCall_AppearEventUnit = function (unit) {
-        alias000.call(this, unit);
+        alias001.call(this, unit);
         var sceneType = root.getBaseScene();
 
         if (sceneType === SceneType.BATTLESETUP || sceneType === SceneType.FREE) {
@@ -969,9 +1017,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias001 = ReinforcementChecker._appearUnit;
+    var alias002 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias001.call(this, pageData, x, y);
+        var unit = alias002.call(this, pageData, x, y);
 
         if (unit !== null) {
             WaitTurnOrderManager.initUnitParam(unit);
@@ -988,9 +1036,9 @@ var WaitTurnOrderManager = {
     var cursorPic = null;
     var iconPic = null;
 
-    var alias002 = SetupControl.setup;
+    var alias003 = SetupControl.setup;
     SetupControl.setup = function () {
-        alias002.call(this);
+        alias003.call(this);
         var baseList;
 
         if (graphicsManager == null) {
@@ -1210,9 +1258,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         新たに作成したMapParts.OrderCursorをMapPartsCollectionに追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias003 = MapPartsCollection._configureMapParts;
+    var alias004 = MapPartsCollection._configureMapParts;
     MapPartsCollection._configureMapParts = function (groupArray) {
-        alias003.call(this, groupArray);
+        alias004.call(this, groupArray);
 
         groupArray.appendObject(MapParts.OrderCursor);
     };
@@ -1220,9 +1268,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         MapLayerクラスに_mapPartsArrayを追加し、MapParts.WTOrderを入れる
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias004 = MapLayer.prepareMapLayer;
+    var alias005 = MapLayer.prepareMapLayer;
     MapLayer.prepareMapLayer = function () {
-        alias004.call(this, MapLayer.prepareMapLayer);
+        alias005.call(this, MapLayer.prepareMapLayer);
 
         this._mapPartsArray = [];
         this._configureMapParts(this._mapPartsArray);
@@ -1244,9 +1292,9 @@ var WaitTurnOrderManager = {
         }
     };
 
-    var alias005 = MapLayer.drawUnitLayer;
+    var alias006 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias005.call(this);
+        alias006.call(this);
 
         this.drawUILayer();
     };
@@ -1254,9 +1302,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘時に毎回UIを描画することのないよう、キャッシュに描画しておく
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias006 = ClipingBattleContainer._createMapCache;
+    var alias007 = ClipingBattleContainer._createMapCache;
     ClipingBattleContainer._createMapCache = function () {
-        var cache = alias006.call(this);
+        var cache = alias007.call(this);
 
         MapLayer.drawUILayer();
 
@@ -1266,9 +1314,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニットメニューにWT値を表示する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias007 = UnitMenuTopWindow.drawWindowContent;
+    var alias008 = UnitMenuTopWindow.drawWindowContent;
     UnitMenuTopWindow.drawWindowContent = function (x, y) {
-        alias007.call(this, x, y);
+        alias008.call(this, x, y);
 
         this._drawUnitWT(x, y);
     };
@@ -1336,9 +1384,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップ上のユニットのキャラチップ上に行動順を描画する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias008 = MapLayer.drawUnitLayer;
+    var alias009 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias008.call(this);
+        alias009.call(this);
 
         this.drawWaitTurnOrderNumber();
     };
@@ -1494,6 +1542,55 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        マップの右端2列または下端2列にユニットの移動範囲や攻撃範囲を示すパネルを表示しないようにする
+    *----------------------------------------------------------------------------------------------------------------*/
+    MapChipLight.setIndexArray = function (indexArray) {
+        this._indexArray = CDB_rebuildIndexArray(indexArray);
+    };
+
+    var alias010 = MarkingPanel.updateMarkingPanel;
+    MarkingPanel.updateMarkingPanel = function () {
+        alias010.call(this);
+        this._indexArray = CDB_rebuildIndexArray(this._indexArray);
+        this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
+    };
+
+    var alias011 = MarkingPanel.updateMarkingPanelFromUnit;
+    MarkingPanel.updateMarkingPanelFromUnit = function (unit) {
+        alias011.call(this, unit);
+        this._indexArray = CDB_rebuildIndexArray(this._indexArray);
+        this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
+    };
+
+    var CDB_rebuildIndexArray = function (indexArray) {
+        var i, index, mapInfo, width, height, count, newIndexArray;
+
+        if (indexArray === null) {
+            return indexArray;
+        }
+
+        mapInfo = root.getCurrentSession().getCurrentMapInfo();
+        width = mapInfo.getMapWidth();
+        height = mapInfo.getMapHeight();
+        count = indexArray.length;
+        newIndexArray = [];
+
+        for (i = 0; i < count; i++) {
+            index = indexArray[i];
+
+            if (IS_WT_ORDER_LIST_LOCATED_RIGHT && Math.floor(index % width) >= width - 2) {
+                continue;
+            } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && Math.floor(index / width) >= height - 2) {
+                continue;
+            }
+
+            newIndexArray.push(index);
+        }
+
+        return newIndexArray;
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         ユニット情報の表示位置を調整する
     *----------------------------------------------------------------------------------------------------------------*/
     MapParts.UnitInfo._getPositionY = function (unit) {
@@ -1542,11 +1639,34 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
+        ユニットコマンドの表示位置を調整する
+    *----------------------------------------------------------------------------------------------------------------*/
+    LayoutControl._getNormalizeX = function (x, width, dx) {
+        var maxWidth = root.getGameAreaWidth();
+
+        if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+            maxWidth -= GraphicsFormat.MAPCHIP_WIDTH * 2;
+        }
+
+        return this._getNormalizeValue(x, width, maxWidth, dx);
+    };
+
+    LayoutControl._getNormalizeY = function (y, height, dy) {
+        var maxHeight = root.getGameAreaHeight();
+
+        if (!IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+            maxHeight -= GraphicsFormat.MAPCHIP_HEIGHT * 2;
+        }
+
+        return this._getNormalizeValue(y, height, maxHeight, dy);
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias009 = ConfigWindow._configureConfigItem;
+    var alias012 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias009.call(this, groupArray);
+        alias012.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
@@ -1590,7 +1710,7 @@ var WaitTurnOrderManager = {
         getObjectivePartsValue: function () {
             var totalWT = WaitTurnOrderManager.getMapTotalWT();
 
-            if (totalWT == null) {
+            if (totalWT < 0) {
                 totalWT = 0;
                 WaitTurnOrderManager.setMapTotalWT(totalWT);
             }
@@ -1651,7 +1771,7 @@ var WaitTurnOrderManager = {
         if (sceneType === SceneType.FREE || sceneType === SceneType.BATTLESETUP) {
             totalWT = WaitTurnOrderManager.getMapTotalWT();
 
-            if (totalWT != null) {
+            if (totalWT >= 0) {
                 customObject.mapTotalWT = totalWT;
             }
         }
