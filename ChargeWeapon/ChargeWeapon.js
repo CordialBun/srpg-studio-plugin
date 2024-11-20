@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-チャージ武器 Ver.1.00
+チャージ武器 Ver.1.01
 
 ※注意
 本プラグインはウェイトターンシステムの拡張機能です。
@@ -43,6 +43,7 @@ SRPG Studio version:1.303
 
 【更新履歴】
 Ver.1.00 2024/11/18 初版
+Ver.1.01 2024/11/20 ディレイアタックの実装に伴い、コードを整理。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -1147,78 +1148,6 @@ var ChargeItemSentenceString = {
 
         _drawCursorShow: function () {
             this._autoActionCursor.drawAutoActionCursor();
-        }
-    });
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        武器の情報ウィンドウにチャージの項目を追加する
-    *----------------------------------------------------------------------------------------------------------------*/
-    var alias034 = ItemInfoWindow._configureWeapon;
-    ItemInfoWindow._configureWeapon = function (groupArray) {
-        alias034.call(this, groupArray);
-
-        groupArray.appendObject(ItemSentence.ChargeWT);
-        groupArray.appendObject(ItemSentence.ChargeWeapon);
-    };
-
-    ItemSentence.ChargeWT = defineObject(BaseItemSentence, {
-        drawItemSentence: function (x, y, item) {
-            var text = CHARGE_TIME_TEXT;
-            var textui = this.getTextUI();
-            var color = ColorValue.KEYWORD;
-            var font = textui.getFont();
-            var chargeType = item.custom.chargeType;
-            var chargeWT = item.custom.chargeWT;
-
-            if (typeof chargeType !== "string" || typeof chargeWT !== "number") {
-                return;
-            }
-
-            TextRenderer.drawKeywordText(x, y, text, -1, color, font);
-            x += ItemInfoRenderer.getSpaceX();
-            y -= 1;
-
-            NumberRenderer.drawRightNumber(x, y, chargeWT);
-        },
-
-        getItemSentenceCount: function (item) {
-            var chargeType = item.custom.chargeType;
-            var chargeWT = item.custom.chargeWT;
-
-            if (typeof chargeType !== "string" || typeof chargeWT !== "number") {
-                return 0;
-            }
-
-            return 1;
-        },
-
-        getTextUI: function () {
-            return root.queryTextUI("default_window");
-        }
-    });
-
-    ItemSentence.ChargeWeapon = defineObject(BaseItemSentence, {
-        drawItemSentence: function (x, y, item) {
-            var text;
-
-            if (this.getItemSentenceCount(item) === 1) {
-                text = ChargeItemSentenceString[item.custom.chargeType];
-                ItemInfoRenderer.drawKeyword(x, y, text);
-            }
-        },
-
-        getItemSentenceCount: function (item) {
-            var chargeType = item.custom.chargeType;
-
-            if (typeof chargeType !== "string") {
-                return 0;
-            }
-
-            return 1;
-        },
-
-        getTextUI: function () {
-            return root.queryTextUI("default_window");
         }
     });
 })();
