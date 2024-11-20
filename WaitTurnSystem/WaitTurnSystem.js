@@ -82,6 +82,8 @@ StringTable.Signal_TotalWT = "経過WT";
 var WaitTurnOrderManager = {
     _unitList: null,
     _orderList: null,
+    _orderTopList: null,
+    _isPredicting: false,
 
     // 初期化
     initialize: function () {
@@ -93,7 +95,6 @@ var WaitTurnOrderManager = {
         var atUnit = this.getATUnit();
 
         this.setNextWT(atUnit);
-        this.initPredictParam(atUnit);
         this.update(false, true);
     },
 
@@ -104,7 +105,7 @@ var WaitTurnOrderManager = {
 
     // ユニットリストと行動順リストを更新する
     update: function (isInitialize, isAttackTurnEnd) {
-        var i, j, count, unit, atUnit, atCurWT, totalWT, defaultWT, obj, curMapInfo;
+        var i, j, count, unit, atUnit, atCurWT, totalWT, defaultWT, obj;
         var playerList = PlayerList.getSortieList();
         var enemyList = EnemyList.getAliveList();
         var allyList = AllyList.getAliveList();
@@ -231,6 +232,7 @@ var WaitTurnOrderManager = {
             return 0;
         });
 
+        this._orderTopList = [];
         count = this._orderList.length;
 
         for (i = 0; i < count; i++) {
@@ -238,8 +240,11 @@ var WaitTurnOrderManager = {
 
             if (obj.isTop) {
                 obj.unit.custom.orderNum = i + 1;
+                this._orderTopList.push(obj);
             }
         }
+
+        this.setPredicting(false);
     },
 
     // ユニットリストを取得する
@@ -254,26 +259,16 @@ var WaitTurnOrderManager = {
 
     // isTopがtrueのオブジェクトのみを含む行動順リストを取得する
     getOrderTopList: function () {
-        var i, obj;
-        var orderList = this.getOrderList();
-        var orderTopList = [];
-        var count = orderList.length;
-
-        for (i = 0; i < count; i++) {
-            obj = orderList[i];
-
-            if (obj.isTop) {
-                orderTopList.push(obj);
-            }
-        }
-
-        return orderTopList;
+        return this._orderTopList;
     },
 
     // ATユニットがとろうとしている行動内容に応じて予測行動順リストを取得する
-    getPredictOrderList: function (atUnit) {
-        var sumWT, i, count, obj, unit;
+    getPredictOrderList: function () {
+        var sumWT, i, key, count, obj, unit, targetUnit, delayWT, predictDelayAttackCount;
+        var atUnit = this.getATUnit();
+        var orderList = this.getOrderList();
         var predictOrderList = [];
+        var targetUnitDict = {};
         var pushCount = 0;
 
         if (atUnit == null || typeof atUnit.custom.curWT !== "number") {
@@ -282,22 +277,34 @@ var WaitTurnOrderManager = {
 
         sumWT = atUnit.custom.curWT;
 
-        count = this._orderList.length;
+        count = orderList.length;
         for (i = 0; i < count; i++) {
-            obj = this._orderList[i];
+            obj = orderList[i];
             unit = obj.unit;
+            delayWT = unit.custom.delayWT;
+            predictDelayAttackCount = unit.custom.predictDelayAttackCount;
 
-            if (unit.getId() !== atUnit.getId()) {
-                predictOrderList.push(obj);
-                pushCount++;
+            if (unit.getId() === atUnit.getId()) {
+                continue;
+            }
 
-                if (pushCount === WaitTurnOrderParam.ORDER_LIST_UNIT_NUM) {
-                    break;
-                }
+            if (typeof delayWT === "number" && typeof predictDelayAttackCount === "number") {
+                targetUnitDict[unit.getId()] = unit;
+                continue;
+            }
+
+            predictOrderList.push(obj);
+            pushCount++;
+
+            if (pushCount === WaitTurnOrderParam.ORDER_LIST_UNIT_NUM) {
+                break;
             }
         }
 
         count = WaitTurnOrderParam.ORDER_LIST_UNIT_NUM;
+        sumWT = atUnit.custom.curWT;
+
+        // ATユニットの行動順予測
         for (i = 0; i < count; i++) {
             predictOrderList.push({
                 unit: atUnit,
@@ -306,6 +313,28 @@ var WaitTurnOrderManager = {
             });
 
             sumWT += i === 0 ? this.calcNextWT(atUnit) : this.calcUnitWT(unit);
+        }
+
+        // ディレイ等の対象となるユニットの行動順予測
+        for (key in targetUnitDict) {
+            targetUnit = targetUnitDict[key];
+            sumWT = targetUnit.custom.curWT;
+            delayWT = targetUnit.custom.delayWT;
+            predictDelayAttackCount = unit.custom.predictDelayAttackCount;
+
+            if (typeof delayWT === "number" && typeof predictDelayAttackCount === "number") {
+                sumWT += Math.max(delayWT * predictDelayAttackCount, 0);
+            }
+
+            for (i = 0; i < count; i++) {
+                predictOrderList.push({
+                    unit: targetUnit,
+                    wt: sumWT,
+                    isTop: i === 0
+                });
+
+                sumWT += this.calcUnitWT(targetUnit);
+            }
         }
 
         predictOrderList = predictOrderList.sort(function (prevObj, nextObj) {
@@ -359,6 +388,7 @@ var WaitTurnOrderManager = {
         }
 
         unit.custom.curWT = this.calcNextWT(unit);
+        delete unit.custom.hasCharged;
     },
 
     // ユニットのカスパラを初期化する
@@ -378,7 +408,7 @@ var WaitTurnOrderManager = {
         var hasCharged = unit.custom.hasCharged;
         var chargeWT = unit.custom.chargeWT;
 
-        if (typeof hasCharged === "boolean" && typeof chargeWT === "number" && hasCharged) {
+        if (typeof hasCharged === "boolean" && hasCharged && typeof chargeWT === "number") {
             return Math.max(chargeWT, 0);
         }
 
@@ -494,14 +524,12 @@ var WaitTurnOrderManager = {
         curMapInfo.custom.totalWT = totalWT;
     },
 
-    // 行動順予測用のカスパラを初期化する
-    initPredictParam: function (unit) {
-        if (unit === null) {
-            return;
-        }
+    isPredicting: function () {
+        return this._isPredicting;
+    },
 
-        delete unit.custom.isPredicting;
-        delete unit.custom.hasCharged;
+    setPredicting: function (isPredicting) {
+        this._isPredicting = isPredicting;
     }
 };
 
@@ -871,41 +899,19 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        移動キャンセル時に待機時間予測用のカスパラを初期化する
-    *----------------------------------------------------------------------------------------------------------------*/
-    MapSequenceCommand._moveCommand = function () {
-        var result;
-
-        if (this._unitCommandManager.moveListCommandManager() !== MoveResult.CONTINUE) {
-            result = this._doLastAction();
-            if (result === 0) {
-                this._straightFlow.enterStraightFlow();
-                this.changeCycleMode(MapSequenceCommandMode.FLOW);
-            } else if (result === 1) {
-                return MapSequenceCommandResult.COMPLETE;
-            } else {
-                WaitTurnOrderManager.initPredictParam(this._targetUnit);
-                this._targetUnit.setMostResentMov(0);
-                return MapSequenceCommandResult.CANCEL;
-            }
-        }
-
-        return MapSequenceCommandResult.NONE;
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
         ユニットコマンド選択中に行動順予測のフラグを立てる
     *----------------------------------------------------------------------------------------------------------------*/
     UnitCommand.Wait.isWaitCommand = true;
 
+    var alias001 = UnitCommand._moveTitle;
     UnitCommand._moveTitle = function () {
         var weapon, isCharging;
+        var result = alias001.call(this);
         var unit = this.getListCommandUnit();
         var mapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
         var object = this._commandScrollbar.getObject();
-        var result = MoveResult.CONTINUE;
 
-        unit.custom.isPredicting = true;
+        WaitTurnOrderManager.setPredicting(true);
 
         if (typeof object.isChargeCommand === "boolean" && object.isChargeCommand) {
             weapon = ItemControl.getEquippedWeapon(unit);
@@ -934,27 +940,12 @@ var WaitTurnOrderManager = {
             delete mapCustom.isWaitSelected;
         }
 
-        if (InputControl.isSelectAction()) {
-            if (object === null) {
-                return result;
-            }
-
-            object.openCommand();
-
-            this._playCommandSelectSound();
-            this.changeCycleMode(ListCommandManagerMode.OPEN);
-        } else if (InputControl.isCancelAction()) {
-            delete unit.custom.isPredicting;
+        if (result === MoveResult.END) {
+            WaitTurnOrderManager.setPredicting(false);
             delete unit.custom.hasCharged;
             delete unit.custom.chargeWT;
             delete unit.custom.chargeWeaponId;
             delete unit.custom.chargeStartMapTotalWT;
-
-            this._playCommandCancelSound();
-            this._checkTracingScroll();
-            result = MoveResult.END;
-        } else {
-            this._commandScrollbar.moveScrollbarCursor();
         }
 
         return result;
@@ -1003,9 +994,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニット登場時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias001 = ScriptCall_AppearEventUnit;
+    var alias002 = ScriptCall_AppearEventUnit;
     ScriptCall_AppearEventUnit = function (unit) {
-        alias001.call(this, unit);
+        alias002.call(this, unit);
         var sceneType = root.getBaseScene();
 
         if (sceneType === SceneType.BATTLESETUP || sceneType === SceneType.FREE) {
@@ -1017,9 +1008,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias002 = ReinforcementChecker._appearUnit;
+    var alias003 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias002.call(this, pageData, x, y);
+        var unit = alias003.call(this, pageData, x, y);
 
         if (unit !== null) {
             WaitTurnOrderManager.initUnitParam(unit);
@@ -1036,9 +1027,9 @@ var WaitTurnOrderManager = {
     var cursorPic = null;
     var iconPic = null;
 
-    var alias003 = SetupControl.setup;
+    var alias004 = SetupControl.setup;
     SetupControl.setup = function () {
-        alias003.call(this);
+        alias004.call(this);
         var baseList;
 
         if (graphicsManager == null) {
@@ -1073,13 +1064,18 @@ var WaitTurnOrderManager = {
         },
 
         _drawContent: function (x, y, textui) {
-            var i, count, obj, unit, isPredicting, width, height;
+            var i, count, orderList, obj, unit, width, height;
             var atUnit = WaitTurnOrderManager.getATUnit();
-            var predictOrderList = WaitTurnOrderManager.getPredictOrderList(atUnit);
             var color = 0x101010;
             var alpha = 130;
 
-            if (predictOrderList == null) {
+            if (WaitTurnOrderManager.isPredicting()) {
+                orderList = WaitTurnOrderManager.getPredictOrderList();
+            } else {
+                orderList = WaitTurnOrderManager.getOrderList();
+            }
+
+            if (orderList == null) {
                 return;
             }
 
@@ -1101,9 +1097,9 @@ var WaitTurnOrderManager = {
                 y += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_Y;
             }
 
-            count = Math.min(predictOrderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
+            count = Math.min(orderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
             for (i = 0; i < count; i++) {
-                obj = predictOrderList[i];
+                obj = orderList[i];
                 unit = obj.unit;
 
                 if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
@@ -1132,8 +1128,7 @@ var WaitTurnOrderManager = {
 
                 // ユニットコマンド選択中はMapParts.OrderCursorによる強調表示がなくなるので
                 // こっちで処理する
-                isPredicting = atUnit.custom.isPredicting;
-                if (typeof isPredicting === "boolean" || isPredicting) {
+                if (WaitTurnOrderManager.isPredicting()) {
                     if (unit.getId() === atUnit.getId() && i > 0) {
                         if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
                             cursorPic.drawParts(x, y, 0, 0, 32, 32);
@@ -1193,12 +1188,16 @@ var WaitTurnOrderManager = {
         },
 
         _drawContent: function (x, y, textui) {
-            var i, count, obj, unit;
-            var atUnit = WaitTurnOrderManager.getATUnit();
-            var predictOrderList = WaitTurnOrderManager.getPredictOrderList(atUnit);
+            var i, count, orderList, obj, unit;
             var targetUnit = null;
 
-            if (predictOrderList == null || this._mapCursor == null) {
+            if (WaitTurnOrderManager.isPredicting()) {
+                orderList = WaitTurnOrderManager.getPredictOrderList();
+            } else {
+                orderList = WaitTurnOrderManager.getOrderList();
+            }
+
+            if (orderList == null || this._mapCursor == null) {
                 return;
             }
 
@@ -1212,9 +1211,9 @@ var WaitTurnOrderManager = {
                 y += 0;
             }
 
-            count = Math.min(predictOrderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
+            count = Math.min(orderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
             for (i = 0; i < count; i++) {
-                obj = predictOrderList[i];
+                obj = orderList[i];
                 unit = obj.unit;
 
                 if (targetUnit != null && targetUnit.getId() === unit.getId() && i > 0) {
@@ -1258,9 +1257,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         新たに作成したMapParts.OrderCursorをMapPartsCollectionに追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias004 = MapPartsCollection._configureMapParts;
+    var alias005 = MapPartsCollection._configureMapParts;
     MapPartsCollection._configureMapParts = function (groupArray) {
-        alias004.call(this, groupArray);
+        alias005.call(this, groupArray);
 
         groupArray.appendObject(MapParts.OrderCursor);
     };
@@ -1268,9 +1267,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         MapLayerクラスに_mapPartsArrayを追加し、MapParts.WTOrderを入れる
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias005 = MapLayer.prepareMapLayer;
+    var alias006 = MapLayer.prepareMapLayer;
     MapLayer.prepareMapLayer = function () {
-        alias005.call(this, MapLayer.prepareMapLayer);
+        alias006.call(this, MapLayer.prepareMapLayer);
 
         this._mapPartsArray = [];
         this._configureMapParts(this._mapPartsArray);
@@ -1292,9 +1291,9 @@ var WaitTurnOrderManager = {
         }
     };
 
-    var alias006 = MapLayer.drawUnitLayer;
+    var alias007 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias006.call(this);
+        alias007.call(this);
 
         this.drawUILayer();
     };
@@ -1302,9 +1301,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘時に毎回UIを描画することのないよう、キャッシュに描画しておく
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias007 = ClipingBattleContainer._createMapCache;
+    var alias008 = ClipingBattleContainer._createMapCache;
     ClipingBattleContainer._createMapCache = function () {
-        var cache = alias007.call(this);
+        var cache = alias008.call(this);
 
         MapLayer.drawUILayer();
 
@@ -1314,9 +1313,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニットメニューにWT値を表示する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias008 = UnitMenuTopWindow.drawWindowContent;
+    var alias009 = UnitMenuTopWindow.drawWindowContent;
     UnitMenuTopWindow.drawWindowContent = function (x, y) {
-        alias008.call(this, x, y);
+        alias009.call(this, x, y);
 
         this._drawUnitWT(x, y);
     };
@@ -1384,9 +1383,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップ上のユニットのキャラチップ上に行動順を描画する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias009 = MapLayer.drawUnitLayer;
+    var alias010 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias009.call(this);
+        alias010.call(this);
 
         this.drawWaitTurnOrderNumber();
     };
@@ -1548,16 +1547,16 @@ var WaitTurnOrderManager = {
         this._indexArray = CDB_rebuildIndexArray(indexArray);
     };
 
-    var alias010 = MarkingPanel.updateMarkingPanel;
+    var alias011 = MarkingPanel.updateMarkingPanel;
     MarkingPanel.updateMarkingPanel = function () {
-        alias010.call(this);
+        alias011.call(this);
         this._indexArray = CDB_rebuildIndexArray(this._indexArray);
         this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
     };
 
-    var alias011 = MarkingPanel.updateMarkingPanelFromUnit;
+    var alias012 = MarkingPanel.updateMarkingPanelFromUnit;
     MarkingPanel.updateMarkingPanelFromUnit = function (unit) {
-        alias011.call(this, unit);
+        alias012.call(this, unit);
         this._indexArray = CDB_rebuildIndexArray(this._indexArray);
         this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
     };
@@ -1664,9 +1663,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias012 = ConfigWindow._configureConfigItem;
+    var alias013 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias012.call(this, groupArray);
+        alias013.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
@@ -1778,4 +1777,103 @@ var WaitTurnOrderManager = {
 
         root.getLoadSaveManager().saveFile(index, this._screenParam.scene, this._screenParam.mapId, customObject);
     };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        武器の情報ウィンドウにチャージやディレイの項目を追加する
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias014 = ItemInfoWindow._configureWeapon;
+    ItemInfoWindow._configureWeapon = function (groupArray) {
+        alias014.call(this, groupArray);
+
+        groupArray.appendObject(ItemSentence.ChargeDelayWT);
+        groupArray.appendObject(ItemSentence.ChargeWeapon);
+        groupArray.appendObject(ItemSentence.DelayWeapon);
+    };
+
+    ItemSentence.ChargeDelayWT = defineObject(BaseItemSentence, {
+        drawItemSentence: function (x, y, item) {
+            var textui = this.getTextUI();
+            var color = ColorValue.KEYWORD;
+            var font = textui.getFont();
+
+            if (typeof CHARGE_TIME_TEXT === "string" && typeof item.custom.chargeWT === "number") {
+                TextRenderer.drawKeywordText(x, y, CHARGE_TIME_TEXT, -1, color, font);
+                x += ItemInfoRenderer.getSpaceX();
+                y -= 1;
+
+                NumberRenderer.drawRightNumber(x, y, item.custom.chargeWT);
+
+                x += 42;
+            }
+
+            if (typeof DELAY_TIME_TEXT === "string" && typeof item.custom.delayWT === "number") {
+                TextRenderer.drawKeywordText(x, y, DELAY_TIME_TEXT, -1, color, font);
+                x += ItemInfoRenderer.getSpaceX();
+                y -= 1;
+
+                NumberRenderer.drawRightNumber(x, y, item.custom.delayWT);
+            }
+        },
+
+        getItemSentenceCount: function (item) {
+            var chargeWT = item.custom.chargeWT;
+            var delayWT = item.custom.delayWT;
+            var chargeParamExist = typeof chargeWT === "number" && typeof CHARGE_TIME_TEXT === "string";
+            var delayParamExist = typeof delayWT === "number" && typeof DELAY_TIME_TEXT === "string";
+
+            if (chargeParamExist || delayParamExist) {
+                return 1;
+            }
+
+            return 0;
+        },
+
+        getTextUI: function () {
+            return root.queryTextUI("default_window");
+        }
+    });
+
+    ItemSentence.ChargeWeapon = defineObject(BaseItemSentence, {
+        drawItemSentence: function (x, y, item) {
+            if (this.getItemSentenceCount(item) === 1) {
+                ItemInfoRenderer.drawKeyword(x, y, ChargeItemSentenceString[item.custom.chargeType]);
+            }
+        },
+
+        getItemSentenceCount: function (item) {
+            var chargeType = item.custom.chargeType;
+
+            if (typeof ChargeItemSentenceString === "undefined" || typeof chargeType !== "string") {
+                return 0;
+            }
+
+            return 1;
+        },
+
+        getTextUI: function () {
+            return root.queryTextUI("default_window");
+        }
+    });
+
+    ItemSentence.DelayWeapon = defineObject(BaseItemSentence, {
+        drawItemSentence: function (x, y, item) {
+            if (this.getItemSentenceCount(item) === 1) {
+                ItemInfoRenderer.drawKeyword(x, y, DELAY_WEAPON_SENTENCE_TEXT);
+            }
+        },
+
+        getItemSentenceCount: function (item) {
+            var delayWT = item.custom.delayWT;
+
+            if (typeof DELAY_WEAPON_SENTENCE_TEXT !== "string" || typeof delayWT !== "number") {
+                return 0;
+            }
+
+            return 1;
+        },
+
+        getTextUI: function () {
+            return root.queryTextUI("default_window");
+        }
+    });
 })();
