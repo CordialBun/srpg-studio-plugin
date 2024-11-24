@@ -70,7 +70,10 @@ var WaitTurnOrderParam = {
     RIGHT_ORDER_LIST_START_POS_Y: 0, // 行動順リストの開始位置のy座標(画面右に表示するときに使用)
     BOTTOM_ORDER_LIST_START_POS_X: 0, // 行動順リストの開始位置のx座標(画面下に表示するときに使用)
     BOTTOM_ORDER_LIST_START_POS_Y: 10, // 行動順リストの開始位置のy座標(画面下に表示するときに使用)
-    ORDER_LIST_UNIT_NUM: 15 // 行動順リストのユニット表示数
+    ORDER_LIST_UNIT_NUM: 15, // 行動順リストのユニット表示数
+    SRC_UNIT_COLOR: 0x0000ff, // カーソル中または行動選択中のユニットの強調表示の色合い
+    DEST_UNIT_COLOR: 0xff0000, // 攻撃やアイテムの対象選択でカーソル中のユニットの強調表示の色合い
+    CHARGE_UNIT_COLOR: 0x008000 // チャージが完了していないユニットの強調表示の色合い
 };
 
 // 目標確認画面やセーブ・ロード画面で表示する経過WTの項目名
@@ -899,7 +902,7 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        ユニットコマンド選択中に行動順予測のフラグを立てる
+        ユニットコマンド選択中に行動順予測のフラグを立て、キャンセルされたらフラグを消す
     *----------------------------------------------------------------------------------------------------------------*/
     UnitCommand.Wait.isWaitCommand = true;
 
@@ -910,8 +913,6 @@ var WaitTurnOrderManager = {
         var unit = this.getListCommandUnit();
         var mapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
         var object = this._commandScrollbar.getObject();
-
-        WaitTurnOrderManager.setPredicting(true);
 
         if (typeof object.isChargeCommand === "boolean" && object.isChargeCommand) {
             weapon = ItemControl.getEquippedWeapon(unit);
@@ -940,12 +941,27 @@ var WaitTurnOrderManager = {
             delete mapCustom.isWaitSelected;
         }
 
+        // ユニットコマンドをキャンセルしたときの処理
         if (result === MoveResult.END) {
             WaitTurnOrderManager.setPredicting(false);
             delete unit.custom.hasCharged;
             delete unit.custom.chargeWT;
             delete unit.custom.chargeWeaponId;
             delete unit.custom.chargeStartMapTotalWT;
+        }
+
+        return result;
+    };
+
+    var alias002 = PlayerTurn._moveArea;
+    PlayerTurn._moveArea = function () {
+        var result = alias002.call(this);
+        var mode = this.getCycleMode();
+        WaitTurnOrderManager.setPredicting(true);
+
+        // ユニットコマンドが開かれる前の移動先選択の段階でキャンセルしたときの処理
+        if (mode === PlayerTurnMode.MAP) {
+            WaitTurnOrderManager.setPredicting(false);
         }
 
         return result;
@@ -994,9 +1010,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニット登場時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias002 = ScriptCall_AppearEventUnit;
+    var alias003 = ScriptCall_AppearEventUnit;
     ScriptCall_AppearEventUnit = function (unit) {
-        alias002.call(this, unit);
+        alias003.call(this, unit);
         var sceneType = root.getBaseScene();
 
         if (sceneType === SceneType.BATTLESETUP || sceneType === SceneType.FREE) {
@@ -1008,9 +1024,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         援軍出現時、ユニットのカスパラを初期化して行動順リストを再構築する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias003 = ReinforcementChecker._appearUnit;
+    var alias004 = ReinforcementChecker._appearUnit;
     ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias003.call(this, pageData, x, y);
+        var unit = alias004.call(this, pageData, x, y);
 
         if (unit !== null) {
             WaitTurnOrderManager.initUnitParam(unit);
@@ -1027,9 +1043,9 @@ var WaitTurnOrderManager = {
     var cursorPic = null;
     var iconPic = null;
 
-    var alias004 = SetupControl.setup;
+    var alias005 = SetupControl.setup;
     SetupControl.setup = function () {
-        alias004.call(this);
+        alias005.call(this);
         var baseList;
 
         if (graphicsManager == null) {
@@ -1064,8 +1080,7 @@ var WaitTurnOrderManager = {
         },
 
         _drawContent: function (x, y, textui) {
-            var i, count, orderList, obj, unit, width, height;
-            var atUnit = WaitTurnOrderManager.getATUnit();
+            var i, count, orderList, obj, unit, width, height, unitRenderParam;
             var color = 0x101010;
             var alpha = 130;
 
@@ -1120,23 +1135,15 @@ var WaitTurnOrderManager = {
                     }
                 }
 
-                if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                    UnitRenderer.drawDefaultUnit(unit, x + 16, y, null);
-                } else {
-                    UnitRenderer.drawDefaultUnit(unit, x, y + 16, null);
-                }
+                unitRenderParam = StructureBuilder.buildUnitRenderParam();
+                unitRenderParam.isSrcUnit = this._isSrcUnit(unit);
+                unitRenderParam.isDestUnit = this._isDestUnit(unit);
+                unitRenderParam.isChargingNotFinished = this._isChargingNotFinished(unit);
 
-                // ユニットコマンド選択中はMapParts.OrderCursorによる強調表示がなくなるので
-                // こっちで処理する
-                if (WaitTurnOrderManager.isPredicting()) {
-                    if (unit.getId() === atUnit.getId() && i > 0) {
-                        if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                            cursorPic.drawParts(x, y, 0, 0, 32, 32);
-                        } else {
-                            cursorPic.setDegree(90);
-                            cursorPic.drawParts(x - 3, y - 10, 0, 0, 32, 32);
-                        }
-                    }
+                if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
+                    UnitRenderer.drawDefaultUnit(unit, x + 16, y, unitRenderParam);
+                } else {
+                    UnitRenderer.drawDefaultUnit(unit, x, y + 16, unitRenderParam);
                 }
 
                 if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
@@ -1147,90 +1154,49 @@ var WaitTurnOrderManager = {
             }
         },
 
-        _getPositionX: function () {
-            if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                return root.getGameAreaWidth() - GraphicsFormat.MAPCHIP_WIDTH * 2;
-            }
-
-            return 0;
-        },
-
-        _getPositionY: function () {
-            if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                return 0;
-            }
-
-            return root.getGameAreaHeight() - GraphicsFormat.MAPCHIP_HEIGHT * 2;
-        },
-
-        _getWindowTextUI: function () {
-            return root.queryTextUI("default_window");
-        }
-    });
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        行動順表示内でマップカーソル中のユニットを強調するMapParts.OrderCursorを新たに作成
-    *----------------------------------------------------------------------------------------------------------------*/
-    MapParts.OrderCursor = defineObject(BaseMapParts, {
-        drawMapParts: function () {
-            var x, y;
-
-            x = this._getPositionX();
-            y = this._getPositionY();
-
-            this._drawMain(x, y);
-        },
-
-        _drawMain: function (x, y) {
-            var textui = this._getWindowTextUI();
-
-            this._drawContent(x, y, textui);
-        },
-
-        _drawContent: function (x, y, textui) {
-            var i, count, orderList, obj, unit;
-            var targetUnit = null;
+        _isSrcUnit: function (unit) {
+            var srcUnit, curSession;
 
             if (WaitTurnOrderManager.isPredicting()) {
-                orderList = WaitTurnOrderManager.getPredictOrderList();
+                srcUnit = WaitTurnOrderManager.getATUnit();
             } else {
-                orderList = WaitTurnOrderManager.getOrderList();
+                curSession = root.getCurrentSession();
+                srcUnit = PosChecker.getUnitFromPos(curSession.getMapCursorX(), curSession.getMapCursorY());
             }
 
-            if (orderList == null || this._mapCursor == null) {
-                return;
-            }
+            return srcUnit !== null && unit.getId() === srcUnit.getId();
+        },
 
-            targetUnit = this.getMapPartsTarget();
+        _isDestUnit: function (unit) {
+            var destUnit, curSession;
 
-            if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                x += 0;
-                y += WaitTurnOrderParam.RIGHT_ORDER_LIST_START_POS_Y;
+            if (WaitTurnOrderManager.isPredicting()) {
+                curSession = root.getCurrentSession();
+                destUnit = PosChecker.getUnitFromPos(curSession.getMapCursorX(), curSession.getMapCursorY());
             } else {
-                x += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_X;
-                y += 0;
+                destUnit = null;
             }
 
-            count = Math.min(orderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
-            for (i = 0; i < count; i++) {
-                obj = orderList[i];
-                unit = obj.unit;
+            return destUnit !== null && unit.getId() === destUnit.getId();
+        },
 
-                if (targetUnit != null && targetUnit.getId() === unit.getId() && i > 0) {
-                    if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                        cursorPic.drawParts(x, y, 0, 0, 32, 32);
-                    } else {
-                        cursorPic.setDegree(90);
-                        cursorPic.drawParts(x - 3, y - 10, 0, 0, 32, 32);
-                    }
-                }
+        _isChargingNotFinished: function (unit) {
+            var chargeWT, chargeStartMapTotalWT, mapTotalWT;
+            var isCharging = unit.custom.isCharging;
 
-                if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                    y += 32;
-                } else {
-                    x += 32;
-                }
+            if (typeof isCharging !== "boolean" || !isCharging) {
+                return false;
             }
+
+            chargeWT = unit.custom.chargeWT;
+            chargeStartMapTotalWT = unit.custom.chargeStartMapTotalWT;
+            mapTotalWT = WaitTurnOrderManager.getMapTotalWT();
+
+            if (typeof chargeWT !== "number" || typeof chargeStartMapTotalWT !== "number" || typeof mapTotalWT !== "number") {
+                return false;
+            }
+
+            return mapTotalWT < chargeStartMapTotalWT + chargeWT;
         },
 
         _getPositionX: function () {
@@ -1255,21 +1221,70 @@ var WaitTurnOrderManager = {
     });
 
     /*-----------------------------------------------------------------------------------------------------------------
-        新たに作成したMapParts.OrderCursorをMapPartsCollectionに追加する
+        行動順リスト内のユニットのキャラチップを強調表示するための関数を追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias005 = MapPartsCollection._configureMapParts;
-    MapPartsCollection._configureMapParts = function (groupArray) {
-        alias005.call(this, groupArray);
+    var alias006 = UnitRenderer.drawCharChip;
+    UnitRenderer.drawCharChip = function (x, y, unitRenderParam) {
+        var isSrcUnit = typeof unitRenderParam.isSrcUnit === "boolean" && unitRenderParam.isSrcUnit;
+        var isDestUnit = typeof unitRenderParam.isDestUnit === "boolean" && unitRenderParam.isDestUnit;
+        var isChargingNotFinished = typeof unitRenderParam.isChargingNotFinished === "boolean" && unitRenderParam.isChargingNotFinished;
 
-        groupArray.appendObject(MapParts.OrderCursor);
+        if (isSrcUnit || isDestUnit || isChargingNotFinished) {
+            this.drawCharChipEx(x, y, unitRenderParam);
+        } else {
+            alias006.call(this, x, y, unitRenderParam);
+        }
+    };
+
+    UnitRenderer.drawCharChipEx = function (x, y, unitRenderParam) {
+        var dx, dy, dxSrc, dySrc;
+        var directionArray = [4, 1, 2, 3, 0];
+        var handle = unitRenderParam.handle;
+        var width = GraphicsFormat.CHARCHIP_WIDTH;
+        var height = GraphicsFormat.CHARCHIP_HEIGHT;
+        var xSrc = handle.getSrcX() * (width * 3);
+        var ySrc = handle.getSrcY() * (height * 5);
+        var pic = this._getGraphics(handle, unitRenderParam.colorIndex);
+        var tileSize = this._getTileSize(unitRenderParam);
+        var isSrcUnit = unitRenderParam.isSrcUnit;
+        var isDestUnit = unitRenderParam.isDestUnit;
+        var isChargingNotFinished = unitRenderParam.isChargingNotFinished;
+
+        if (pic === null) {
+            return;
+        }
+
+        dx = Math.floor((width - tileSize.width) / 2);
+        dy = Math.floor((height - tileSize.height) / 2);
+        dxSrc = unitRenderParam.animationIndex;
+        dySrc = directionArray[unitRenderParam.direction];
+
+        pic.setAlpha(unitRenderParam.alpha);
+        pic.setDegree(unitRenderParam.degree);
+        pic.setReverse(unitRenderParam.isReverse);
+
+        if (typeof isSrcUnit === "boolean" && isSrcUnit) {
+            pic.setColor(WaitTurnOrderParam.SRC_UNIT_COLOR, 120);
+        } else if (typeof isDestUnit === "boolean" && isDestUnit) {
+            pic.setColor(WaitTurnOrderParam.DEST_UNIT_COLOR, 120);
+        } else if (typeof isChargingNotFinished === "boolean" && isChargingNotFinished) {
+            pic.setColor(WaitTurnOrderParam.CHARGE_UNIT_COLOR, 120);
+        }
+
+        try {
+            pic.drawStretchParts(x - dx, y - dy, width, height, xSrc + dxSrc * width, ySrc + dySrc * height, width, height);
+        } catch (e) {
+            // xとyが不正な値である場合、スタックオーバーフローでここが実行される。
+            // draw系メソッドは定期的に呼ばれるため、エラー出力は、root.msg('')ではなく、root.log('');が向いている。
+        }
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
         MapLayerクラスに_mapPartsArrayを追加し、MapParts.WTOrderを入れる
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias006 = MapLayer.prepareMapLayer;
+    var alias007 = MapLayer.prepareMapLayer;
     MapLayer.prepareMapLayer = function () {
-        alias006.call(this, MapLayer.prepareMapLayer);
+        alias007.call(this, MapLayer.prepareMapLayer);
 
         this._mapPartsArray = [];
         this._configureMapParts(this._mapPartsArray);
@@ -1291,9 +1306,9 @@ var WaitTurnOrderManager = {
         }
     };
 
-    var alias007 = MapLayer.drawUnitLayer;
+    var alias008 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias007.call(this);
+        alias008.call(this);
 
         this.drawUILayer();
     };
@@ -1301,9 +1316,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘時に毎回UIを描画することのないよう、キャッシュに描画しておく
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias008 = ClipingBattleContainer._createMapCache;
+    var alias009 = ClipingBattleContainer._createMapCache;
     ClipingBattleContainer._createMapCache = function () {
-        var cache = alias008.call(this);
+        var cache = alias009.call(this);
 
         MapLayer.drawUILayer();
 
@@ -1313,9 +1328,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         ユニットメニューにWT値を表示する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias009 = UnitMenuTopWindow.drawWindowContent;
+    var alias010 = UnitMenuTopWindow.drawWindowContent;
     UnitMenuTopWindow.drawWindowContent = function (x, y) {
-        alias009.call(this, x, y);
+        alias010.call(this, x, y);
 
         this._drawUnitWT(x, y);
     };
@@ -1383,9 +1398,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップ上のユニットのキャラチップ上に行動順を描画する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias010 = MapLayer.drawUnitLayer;
+    var alias011 = MapLayer.drawUnitLayer;
     MapLayer.drawUnitLayer = function () {
-        alias010.call(this);
+        alias011.call(this);
 
         this.drawWaitTurnOrderNumber();
     };
@@ -1547,16 +1562,16 @@ var WaitTurnOrderManager = {
         this._indexArray = CDB_rebuildIndexArray(indexArray);
     };
 
-    var alias011 = MarkingPanel.updateMarkingPanel;
+    var alias012 = MarkingPanel.updateMarkingPanel;
     MarkingPanel.updateMarkingPanel = function () {
-        alias011.call(this);
+        alias012.call(this);
         this._indexArray = CDB_rebuildIndexArray(this._indexArray);
         this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
     };
 
-    var alias012 = MarkingPanel.updateMarkingPanelFromUnit;
+    var alias013 = MarkingPanel.updateMarkingPanelFromUnit;
     MarkingPanel.updateMarkingPanelFromUnit = function (unit) {
-        alias012.call(this, unit);
+        alias013.call(this, unit);
         this._indexArray = CDB_rebuildIndexArray(this._indexArray);
         this._indexArrayWeapon = CDB_rebuildIndexArray(this._indexArrayWeapon);
     };
@@ -1663,9 +1678,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias013 = ConfigWindow._configureConfigItem;
+    var alias014 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
-        alias013.call(this, groupArray);
+        alias014.call(this, groupArray);
         var i, obj;
         var count = groupArray.length;
 
@@ -1781,9 +1796,9 @@ var WaitTurnOrderManager = {
     /*-----------------------------------------------------------------------------------------------------------------
         武器の情報ウィンドウにチャージやディレイの項目を追加する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias014 = ItemInfoWindow._configureWeapon;
+    var alias015 = ItemInfoWindow._configureWeapon;
     ItemInfoWindow._configureWeapon = function (groupArray) {
-        alias014.call(this, groupArray);
+        alias015.call(this, groupArray);
 
         groupArray.appendObject(ItemSentence.ChargeDelayWT);
         groupArray.appendObject(ItemSentence.ChargeWeapon);
