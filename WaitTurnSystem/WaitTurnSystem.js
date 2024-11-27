@@ -64,20 +64,86 @@ var IS_ALL_BELONGINGS_APPLICABLE = true;
 // 行動順リストを画面右に表示する場合はtrue、画面下に表示する場合はfalse
 var IS_WT_ORDER_LIST_LOCATED_RIGHT = true;
 
+// 行動順リストの表示形式切り替えを有効にする場合はtrue、無効にする場合はfalse
+// IS_WT_ORDER_LIST_LOCATED_RIGHTがfalseのとき、つまり行動順リストが画面下に表示されているときのみ適用される
+var IS_SWITCHING_WT_ORDER_ALLOWED = false;
+
+// コンフィグ「行動順ゲージのWT最大値」を有効にする場合はtrue、無効にする場合はfalse
+// IS_WT_ORDER_LIST_LOCATED_RIGHTがfalse かつ IS_SWITCHING_WT_ORDER_ALLOWEDがtrueのときのみ適用される
+// 無効にした場合、ゲージのWT最大値はWaitTurnOrderParam.MAX_WT_ARRAYの最後尾の数値が使われる
+var IS_CONFIG_MAX_WT_ALLOWED = false;
+
 // 行動順リストの描画に関するパラメータ
 var WaitTurnOrderParam = {
-    RIGHT_ORDER_LIST_START_POS_X: 10, // 行動順リストの開始位置のx座標(画面右に表示するときに使用)
-    RIGHT_ORDER_LIST_START_POS_Y: 0, // 行動順リストの開始位置のy座標(画面右に表示するときに使用)
-    BOTTOM_ORDER_LIST_START_POS_X: 0, // 行動順リストの開始位置のx座標(画面下に表示するときに使用)
-    BOTTOM_ORDER_LIST_START_POS_Y: 10, // 行動順リストの開始位置のy座標(画面下に表示するときに使用)
-    ORDER_LIST_UNIT_NUM: 15, // 行動順リストのユニット表示数
-    SRC_UNIT_COLOR: 0x0000ff, // カーソル中または行動選択中のユニットの強調表示の色合い
-    DEST_UNIT_COLOR: 0xff0000, // 攻撃やアイテムの対象選択でカーソル中のユニットの強調表示の色合い
-    CHARGE_UNIT_COLOR: 0x008000 // チャージが完了していないユニットの強調表示の色合い
+    GRID_ROW_COUNT: 2, // マップの何列分を行動順リストの表示領域として使用するか
+    SRC_UNIT_COLOR: 0x0000ff, // カーソル中または行動選択中のユニットの強調表示の色合い(カラーコード)
+    DEST_UNIT_COLOR: 0xff0000, // 攻撃やアイテムの対象選択でカーソル中のユニットの強調表示の色合い(カラーコード)
+    CHARGE_UNIT_COLOR: 0x008000, // チャージが完了していないユニットの強調表示の色合い(カラーコード)
+
+    // 画面右に表示するときに使用するパラメータ
+    RIGHT_BASE_ALIGN_X: 10, // 行動順リストのx座標補正値(px)
+    RIGHT_BASE_ALIGN_Y: 0, // 行動順リストのy座標補正値(px)
+
+    // 画面下に表示するときに使用するパラメータ
+    BOTTOM_BASE_ALIGN_X: 0, // 行動順リストのx座標補正値(px)
+    BOTTOM_BASE_ALIGN_Y: 10, // 行動順リストのy座標補正値(px)
+
+    // リスト表示で使用するパラメータ
+    ORDER_LIST_UNIT_NUM: 15, // 表示するユニットの数
+    UNIT_INTERVAL: 32, // ユニットの表示間隔(px)
+
+    // ゲージ表示で使用するパラメータ
+    MAX_WT_ARRAY: [25, 50, 100], // WTの最大値 WT値がこれを超えているユニットはゲージに表示されない
+    MAX_WT_STRING_ARRAY: ["25", "50", "100"], // コンフィグで表示する文字列
+    MIN_WT_ALIGN_X: 15, // 最小WT(0)の数字のx座標補正値(px)
+    MIN_WT_ALIGN_Y: 40, // 最小WT(0)の数字のy座標補正値(px)
+    MAX_WT_ALIGN_X: 625, // 最大WTの数字のx座標補正値(px)
+    MAX_WT_ALIGN_Y: 40, // 最大WTの数字のy座標補正値(px)
+    ARROW_WIDTH: 600, // 矢印の横幅
+    ARROW_ALIGN_X: 20, // 矢印のx座標補正値(px)
+    ARROW_ALIGN_Y: 24, // 矢印のy座標補正値(px)
+    SCALE_LINE_LENGTH: 10, // 目盛り線の長さ(px)
+    SCALE_LINE_ALIGN_Y: 45, // 目盛り線のy座標補正値(px)
+    SCALE_LINE_COLOR: 0x0095d9, // 目盛り線の色(カラーコード)
+    UNIT_AREA_WIDTH: 563, // ユニットのキャラチップを表示する領域の横幅
+    UNIT_AREA_ALIGN_X: 20, // ユニットのキャラチップを表示する領域のx座標補正値(px)
+    UNIT_AREA_ALIGN_Y: -5, // ユニットのキャラチップを表示する領域のy座標補正値(px)
+    CURSOR_ALIGN_X: 0, // カーソルのx座標補正値(px)
+    CURSOR_ALIGN_Y: 36 // カーソルのy座標補正値(px)
+};
+
+// 画像に関するパラメータ
+var WaitTurnImageParam = {
+    IS_WT_ORDER_BACK_ORIGINAL: false, // 行動順リストの背景を独自の画像にする場合はtrue、デフォルトのままにする場合はfalse
+    IS_AT_ICON_ORIGINAL: false, // ATアイコンを独自の画像にする場合はtrue、ランタイムのものを使用する場合はfalse
+    MATERIAL_FOLDER_NAME: "WaitTurnImage", // 画像ファイルを配置するフォルダの名前
+    BACK_FILE_NAME: "window.png", // 行動順リストの背景画像のファイル名
+    ARROW_FILE_NAME: "arrow.png", // 矢印の画像のファイル名
+    CURSOR_FILE_NAME: "cursor.png", // カーソルの画像のファイル名
+    AT_ICON_FILE_NAME: "at_icon.png", // ATアイコンの画像のファイル名
+    backImage: null, // 背景画像のデータ(変更不要)
+    arrowImage: null, // 矢印の画像データ(変更不要)
+    cursorImage: null, // カーソルの画像データ(変更不要)
+    atIconImage: null // ATアイコンの画像データ(変更不要)
+};
+
+// 効果音に関するパラメータ
+var WaitTurnSoundParam = {
+    IS_PLAYER_AT_STARD_SOUND_ORIGINAL: false, // 自軍ユニットのAT開始時の効果音を独自のものにする場合はtrue、ランタイムのものを使用する場合はfalse
+    IS_SWITCHING_WT_ORDER_SOUND_ORIGINAL: false, // 行動順リスト切り替え時の効果音を独自のものにする場合はtrue、ランタイムのものを使用する場合はfalse
+    MATERIAL_FOLDER_NAME: "WaitTurnSound", // 音声ファイルを配置するフォルダの名前
+    PLAYER_AT_START_SOUND_FILE_NAME: "player_at_start.mp3", // 自軍ユニットのAT開始時の効果音のファイル名
+    SWITCHING_WT_ORDER_SOUND_FILE_NAME: "switch_wt_order.mp3" // 行動順リスト切り替え時の効果音のファイル名
 };
 
 // 目標確認画面やセーブ・ロード画面で表示する経過WTの項目名
 StringTable.Signal_TotalWT = "経過WT";
+
+// コンフィグの「行動順ゲージのWT最大値」の項目名
+StringTable.Config_MaxWT = "行動順ゲージのWT最大値";
+
+// コンフィグの「行動順ゲージのWT最大値」の説明文
+StringTable.Config_MaxWTDescription = "行動順ゲージにおけるWTの最大値を決定します";
 
 /*-----------------------------------------------------------------------------------------------------------------
     行動順リストを管理するオブジェクト
@@ -364,6 +430,70 @@ var WaitTurnOrderManager = {
         return predictOrderList;
     },
 
+    getPredictOrderTopList: function () {
+        var i, count, obj, unit, delayWT, predictDelayAttackCount;
+        var atUnit = this.getATUnit();
+        var orderTopList = this.getOrderTopList();
+        var predictOrderTopList = [];
+
+        if (atUnit === null || typeof atUnit.custom.curWT !== "number") {
+            return null;
+        }
+
+        count = orderTopList.length;
+        for (i = 0; i < count; i++) {
+            obj = orderTopList[i];
+            unit = obj.unit;
+            delayWT = unit.custom.delayWT;
+            predictDelayAttackCount = unit.custom.predictDelayAttackCount;
+
+            // ATユニットの行動順予測
+            if (unit.getId() === atUnit.getId()) {
+                predictOrderTopList.push({
+                    unit: unit,
+                    wt: this.calcNextWT(unit),
+                    isTop: true
+                });
+            }
+
+            // ディレイ等の対象となるユニットの行動順予測
+            if (typeof delayWT === "number" && typeof predictDelayAttackCount === "number") {
+                predictOrderTopList.push({
+                    unit: unit,
+                    wt: unit.custom.curWT + Math.max(delayWT * predictDelayAttackCount, 0),
+                    isTop: true
+                });
+
+                continue;
+            }
+
+            predictOrderTopList.push(obj);
+        }
+
+        predictOrderTopList = predictOrderTopList.sort(function (prevObj, nextObj) {
+            if (prevObj.wt < nextObj.wt) {
+                return -1;
+            } else if (prevObj.wt > nextObj.wt) {
+                return 1;
+            } else {
+                if (prevObj.unit.getUnitType() < nextObj.unit.getUnitType()) {
+                    return -1;
+                } else if (prevObj.unit.getUnitType() > nextObj.unit.getUnitType()) {
+                    return 1;
+                } else {
+                    if (prevObj.unit.getId() < nextObj.unit.getId()) {
+                        return -1;
+                    } else if (prevObj.unit.getId() > nextObj.unit.getId()) {
+                        return 1;
+                    }
+                }
+            }
+            return 0;
+        });
+
+        return predictOrderTopList;
+    },
+
     // ATユニットを取得する
     getATUnit: function () {
         if (this._unitList === null || this._unitList.length === 0) {
@@ -537,6 +667,47 @@ var WaitTurnOrderManager = {
 };
 
 (function () {
+    /*-----------------------------------------------------------------------------------------------------------------
+        ゲーム開始時にGraphicsManagerと各種画像を読み込む 
+    *----------------------------------------------------------------------------------------------------------------*/
+    var graphicsManager = null;
+
+    var alias005 = SetupControl.setup;
+    SetupControl.setup = function () {
+        alias005.call(this);
+        var baseList, fileName;
+        var material = WaitTurnImageParam.MATERIAL_FOLDER_NAME;
+
+        if (graphicsManager === null) {
+            graphicsManager = root.getGraphicsManager();
+        }
+
+        if (WaitTurnImageParam.atIconImage == null) {
+            if (WaitTurnImageParam.IS_AT_ICON_ORIGINAL) {
+                fileName = WaitTurnImageParam.AT_ICON_FILE_NAME;
+                WaitTurnImageParam.atIconImage = root.getMaterialManager().createImage(material, fileName);
+            } else {
+                baseList = root.getBaseData().getGraphicsResourceList(GraphicsType.ICON, true);
+                WaitTurnImageParam.atIconImage = baseList.getCollectionData(1, 0);
+            }
+        }
+
+        if (WaitTurnImageParam.backImage === null) {
+            fileName = WaitTurnImageParam.BACK_FILE_NAME;
+            WaitTurnImageParam.backImage = root.getMaterialManager().createImage(material, fileName);
+        }
+
+        if (WaitTurnImageParam.arrowImage === null) {
+            fileName = WaitTurnImageParam.ARROW_FILE_NAME;
+            WaitTurnImageParam.arrowImage = root.getMaterialManager().createImage(material, fileName);
+        }
+
+        if (WaitTurnImageParam.cursorImage === null) {
+            fileName = WaitTurnImageParam.CURSOR_FILE_NAME;
+            WaitTurnImageParam.cursorImage = root.getMaterialManager().createImage(material, fileName);
+        }
+    };
+
     /*-----------------------------------------------------------------------------------------------------------------
         出撃準備画面で出撃ユニットを変更時、行動順リストを初期化する
     *----------------------------------------------------------------------------------------------------------------*/
@@ -730,16 +901,23 @@ var WaitTurnOrderManager = {
     };
 
     TurnChangeStart.doLastAction = function () {
+        var material, fileName;
         var turnType = root.getCurrentSession().getTurnType();
         var curMapCustom = root.getCurrentSession().getCurrentMapInfo().custom;
         var isWaitSelected = typeof curMapCustom.isWaitSelected === "boolean" ? curMapCustom.isWaitSelected : false;
 
         // 直前に待機コマンドが選択されているときに効果音が二重に再生されるのを防ぐ
         if (turnType === TurnType.PLAYER && !isWaitSelected) {
-            MediaControl.soundDirect("commandselect");
+            if (WaitTurnSoundParam.IS_PLAYER_AT_STARD_SOUND_ORIGINAL) {
+                material = WaitTurnSoundParam.MATERIAL_FOLDER_NAME;
+                fileName = WaitTurnSoundParam.PLAYER_AT_START_SOUND_FILE_NAME;
+                root.getMaterialManager().soundPlay(material, fileName, 0);
+            } else {
+                MediaControl.soundDirect("commandselect");
+            }
         }
 
-        curMapCustom.isWaitSelected = false;
+        delete curMapCustom.isWaitSelected;
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -1037,33 +1215,31 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        ゲーム開始時にGraphicsManagerとカーソル画像を読み込む
-    *----------------------------------------------------------------------------------------------------------------*/
-    var graphicsManager = null;
-    var cursorPic = null;
-    var iconPic = null;
-
-    var alias005 = SetupControl.setup;
-    SetupControl.setup = function () {
-        alias005.call(this);
-        var baseList;
-
-        if (graphicsManager == null) {
-            graphicsManager = root.getGraphicsManager();
-        }
-        if (cursorPic == null) {
-            cursorPic = root.queryUI("command_poschangecursor");
-        }
-        if (iconPic == null) {
-            baseList = root.getBaseData().getGraphicsResourceList(GraphicsType.ICON, true);
-            iconPic = baseList.getCollectionData(1, 0);
-        }
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
         ユニットの行動順を表示するMapParts.WTOrderを新たに作成
     *----------------------------------------------------------------------------------------------------------------*/
+    var WTOrderMode = {
+        LIST: 0,
+        GAUGE: 1
+    };
+
     MapParts.WTOrder = defineObject(BaseMapParts, {
+        moveMapParts: function () {
+            var mode = this.getCycleMode();
+            var isSwitchingAllowed = !IS_WT_ORDER_LIST_LOCATED_RIGHT && IS_SWITCHING_WT_ORDER_ALLOWED;
+            var isCursorMoveMode = SceneManager.getMapEditMode() === MapEditMode.CURSORMOVE;
+            var isMapMode = SceneManager.getPlayerTurnCycleMode() === PlayerTurnMode.MAP;
+            var isSetupEditMode = SceneManager.getBattleSetupCycleMode() === BattleSetupMode.SETUPEDIT;
+
+            if (isSwitchingAllowed && InputControl.isOptionAction() && ((isMapMode && isCursorMoveMode) || isSetupEditMode)) {
+                mode++;
+                mode %= 2;
+                this.playSwitchSound();
+                this.changeCycleMode(mode);
+            }
+
+            return MoveResult.END;
+        },
+
         drawMapParts: function () {
             var x, y;
 
@@ -1074,42 +1250,150 @@ var WaitTurnOrderManager = {
         },
 
         _drawMain: function (x, y) {
-            var textui = this._getWindowTextUI();
+            var orderList;
+            var mode = this.getCycleMode();
 
-            this._drawContent(x, y, textui);
-        },
-
-        _drawContent: function (x, y, textui) {
-            var i, count, orderList, obj, unit, width, height, unitRenderParam;
-            var color = 0x101010;
-            var alpha = 130;
-
-            if (WaitTurnOrderManager.isPredicting()) {
-                orderList = WaitTurnOrderManager.getPredictOrderList();
+            if (mode === WTOrderMode.LIST) {
+                if (WaitTurnOrderManager.isPredicting()) {
+                    orderList = WaitTurnOrderManager.getPredictOrderList();
+                } else {
+                    orderList = WaitTurnOrderManager.getOrderList();
+                }
             } else {
-                orderList = WaitTurnOrderManager.getOrderList();
+                if (WaitTurnOrderManager.isPredicting()) {
+                    orderList = WaitTurnOrderManager.getPredictOrderTopList();
+                } else {
+                    orderList = WaitTurnOrderManager.getOrderTopList();
+                }
             }
 
-            if (orderList == null) {
+            if (orderList === null) {
                 return;
             }
 
+            this._drawBack(x, y);
+
+            if (mode === WTOrderMode.GAUGE) {
+                this._drawLine(x, y);
+                this._drawArrow(x, y);
+                this._drawWT(x, y);
+                this._drawContentEx(x, y, orderList);
+            } else {
+                this._drawContent(x, y, orderList);
+            }
+        },
+
+        _drawBack: function (x, y, textui) {
+            var width, height, pic, color, alpha;
+
             if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                width = root.getCharChipWidth() * 2;
+                width = GraphicsFormat.MAPCHIP_WIDTH * WaitTurnOrderParam.GRID_ROW_COUNT;
                 height = root.getGameAreaHeight();
             } else {
                 width = root.getGameAreaWidth();
-                height = root.getCharChipHeight() * 2;
+                height = GraphicsFormat.MAPCHIP_HEIGHT * WaitTurnOrderParam.GRID_ROW_COUNT;
             }
 
-            graphicsManager.fillRange(x, y, width, height, color, alpha);
+            if (WaitTurnImageParam.IS_WT_ORDER_BACK_ORIGINAL) {
+                pic = WaitTurnImageParam.backImage;
+                WindowRenderer.drawStretchWindow(x, y, width, height, pic);
+            } else {
+                color = 0x101010;
+                alpha = 130;
+                graphicsManager.fillRange(x, y, width, height, color, alpha);
+            }
+        },
+
+        _drawLine: function (x, y) {
+            var height = WaitTurnOrderParam.SCALE_LINE_LENGTH;
+            var arrowWidth = WaitTurnOrderParam.ARROW_WIDTH - 36;
+            var color = WaitTurnOrderParam.SCALE_LINE_COLOR;
+            var alpha = 255;
+
+            x += 36 + arrowWidth / 4;
+            y += WaitTurnOrderParam.SCALE_LINE_ALIGN_Y;
+
+            graphicsManager.fillRange(x, y, 1, height, color, alpha);
+            x += arrowWidth / 4;
+            graphicsManager.fillRange(x, y, 1, height, color, alpha);
+            x += arrowWidth / 4;
+            graphicsManager.fillRange(x, y, 1, height, color, alpha);
+            x += arrowWidth / 4;
+            graphicsManager.fillRange(x, y, 1, height, color, alpha);
+        },
+
+        _drawArrow: function (x, y, pic) {
+            var height, picCache;
+            var width = WaitTurnOrderParam.ARROW_WIDTH;
+            var height = 60;
+            var pic = WaitTurnImageParam.arrowImage;
+
+            if (pic === null) {
+                return;
+            }
+
+            height = pic.getHeight();
+            picCache = CacheControl.getCacheGraphics(width, height, pic);
+
+            if (picCache !== null) {
+                if (picCache.isCacheAvailable()) {
+                    picCache.draw(x, y);
+                    return;
+                }
+            } else {
+                picCache = CacheControl.createCacheGraphics(width, height, pic);
+            }
+
+            graphicsManager.setRenderCache(picCache);
+            this._drawArrowInternal(0, 0, width, pic);
+            graphicsManager.resetRenderCache();
+
+            picCache.draw(x, y);
+        },
+
+        _drawWT: function (x, y) {
+            var maxWTIndex = root.getExternalData().env.maxWTIndex;
+            var maxWT = WaitTurnOrderParam.MAX_WT_ARRAY[maxWTIndex];
+            var minWTAlignX = WaitTurnOrderParam.MIN_WT_ALIGN_X;
+            var minWTAlignY = WaitTurnOrderParam.MIN_WT_ALIGN_Y;
+            var maxWTAlignX = WaitTurnOrderParam.MAX_WT_ALIGN_X;
+            var maxWTAlignY = WaitTurnOrderParam.MAX_WT_ALIGN_Y;
+
+            NumberRenderer.drawNumber(x + minWTAlignX, y + minWTAlignY, 0);
+            NumberRenderer.drawNumber(x + maxWTAlignX, y + maxWTAlignY, maxWT);
+        },
+
+        _drawArrowInternal: function (x, y, width, pic) {
+            var i, alignX;
+            var picWidth = pic.getWidth();
+            var picHeight = pic.getHeight();
+            var frameWidth = picWidth / 3;
+            var bodyWidth = picWidth - frameWidth * 2;
+            var maxWidth = width;
+            var arrowBodyWidth = maxWidth - frameWidth * 2;
+
+            x += WaitTurnOrderParam.ARROW_ALIGN_X;
+            y += WaitTurnOrderParam.ARROW_ALIGN_Y;
+
+            pic.drawParts(x, y, 0, 0, frameWidth, picHeight);
+
+            for (i = frameWidth; i < maxWidth - frameWidth; i++) {
+                alignX = Math.floor((bodyWidth * i) / arrowBodyWidth);
+                pic.drawParts(x + i, y, frameWidth + alignX, 0, 1, picHeight);
+            }
+
+            pic.drawParts(x + maxWidth - frameWidth, y, picWidth - frameWidth, 0, frameWidth, picHeight);
+        },
+
+        _drawContent: function (x, y, orderList) {
+            var i, count, obj, unit, unitRenderParam;
 
             if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                x += WaitTurnOrderParam.RIGHT_ORDER_LIST_START_POS_X;
-                y += WaitTurnOrderParam.RIGHT_ORDER_LIST_START_POS_Y;
+                x += WaitTurnOrderParam.RIGHT_BASE_ALIGN_X;
+                y += WaitTurnOrderParam.RIGHT_BASE_ALIGN_Y;
             } else {
-                x += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_X;
-                y += WaitTurnOrderParam.BOTTOM_ORDER_LIST_START_POS_Y;
+                x += WaitTurnOrderParam.BOTTOM_BASE_ALIGN_X;
+                y += WaitTurnOrderParam.BOTTOM_BASE_ALIGN_Y;
             }
 
             count = Math.min(orderList.length, WaitTurnOrderParam.ORDER_LIST_UNIT_NUM);
@@ -1119,13 +1403,13 @@ var WaitTurnOrderManager = {
 
                 if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
                     if (i === 0) {
-                        iconPic.drawParts(x - 10, y + 5, 0, 24 * 3, 24, 24);
+                        this._drawIcon(x - 10, y + 5);
                     } else {
                         NumberRenderer.drawNumber(x, y + 4, i + 1);
                     }
                 } else {
                     if (i === 0) {
-                        iconPic.drawParts(x + 5, y - 10, 0, 24 * 3, 24, 24);
+                        this._drawIcon(x + 5, y - 10);
                     } else {
                         if (i + 1 < 10) {
                             NumberRenderer.drawNumber(x + 11, y - 10, i + 1);
@@ -1147,10 +1431,99 @@ var WaitTurnOrderManager = {
                 }
 
                 if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                    y += 32;
+                    y += WaitTurnOrderParam.UNIT_INTERVAL;
                 } else {
-                    x += 32;
+                    x += WaitTurnOrderParam.UNIT_INTERVAL;
                 }
+            }
+        },
+
+        _drawContentEx: function (x, y, orderList) {
+            var i, count, obj, unit, curWT, alighX, unitRenderParam;
+            var maxWTIndex = root.getExternalData().env.maxWTIndex;
+            var maxWT = WaitTurnOrderParam.MAX_WT_ARRAY[maxWTIndex];
+            var maxWidth = WaitTurnOrderParam.UNIT_AREA_WIDTH;
+            var srcUnitObjArray = [];
+            var destUnitObjArray = [];
+            var cursorPic = WaitTurnImageParam.cursorImage;
+            var cursorAlignX = WaitTurnOrderParam.CURSOR_ALIGN_X;
+            var cursorAlignY = WaitTurnOrderParam.CURSOR_ALIGN_Y;
+
+            if (cursorPic === null) {
+                return;
+            }
+
+            x += WaitTurnOrderParam.UNIT_AREA_ALIGN_X;
+            y += WaitTurnOrderParam.UNIT_AREA_ALIGN_Y;
+
+            count = orderList.length;
+            for (i = count - 1; i >= 0; i--) {
+                obj = orderList[i];
+                unit = obj.unit;
+                curWT = obj.wt;
+
+                if (curWT > maxWT) {
+                    continue;
+                }
+
+                alighX = Math.floor((maxWidth * curWT) / maxWT);
+
+                unitRenderParam = StructureBuilder.buildUnitRenderParam();
+                unitRenderParam.isSrcUnit = this._isSrcUnit(unit);
+                unitRenderParam.isDestUnit = this._isDestUnit(unit);
+                unitRenderParam.isChargingNotFinished = this._isChargingNotFinished(unit);
+
+                if (unitRenderParam.isSrcUnit) {
+                    srcUnitObjArray.push(obj);
+                    continue;
+                } else if (unitRenderParam.isDestUnit) {
+                    destUnitObjArray.push(obj);
+                    continue;
+                }
+
+                cursorPic.draw(x + alighX + cursorAlignX, y + cursorAlignY);
+                UnitRenderer.drawDefaultUnit(unit, x + alighX, y + 16, unitRenderParam);
+            }
+
+            // 強調表示するユニットは後から描画する
+            count = destUnitObjArray.length;
+            for (i = count - 1; i >= 0; i--) {
+                obj = destUnitObjArray[i];
+                unit = obj.unit;
+                curWT = obj.wt;
+                alighX = Math.floor((maxWidth * curWT) / maxWT);
+
+                unitRenderParam = StructureBuilder.buildUnitRenderParam();
+                unitRenderParam.isSrcUnit = false;
+                unitRenderParam.isDestUnit = true;
+                unitRenderParam.isChargingNotFinished = false;
+
+                cursorPic.draw(x + alighX + cursorAlignX, y + cursorAlignY);
+                UnitRenderer.drawDefaultUnit(unit, x + alighX, y + 16, unitRenderParam);
+            }
+
+            count = srcUnitObjArray.length;
+            for (i = count - 1; i >= 0; i--) {
+                obj = srcUnitObjArray[i];
+                unit = obj.unit;
+                curWT = obj.wt;
+                alighX = Math.floor((maxWidth * curWT) / maxWT);
+
+                unitRenderParam = StructureBuilder.buildUnitRenderParam();
+                unitRenderParam.isSrcUnit = true;
+                unitRenderParam.isDestUnit = false;
+                unitRenderParam.isChargingNotFinished = false;
+
+                cursorPic.draw(x + alighX + cursorAlignX, y + cursorAlignY);
+                UnitRenderer.drawDefaultUnit(unit, x + alighX, y + 16, unitRenderParam);
+            }
+        },
+
+        _drawIcon: function (x, y) {
+            if (WaitTurnImageParam.IS_AT_ICON_ORIGINAL) {
+                WaitTurnImageParam.atIconImage.draw(x, y);
+            } else {
+                WaitTurnImageParam.atIconImage.drawParts(x, y, 0, 24 * 3, 24, 24);
             }
         },
 
@@ -1201,7 +1574,7 @@ var WaitTurnOrderManager = {
 
         _getPositionX: function () {
             if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-                return root.getGameAreaWidth() - GraphicsFormat.MAPCHIP_WIDTH * 2;
+                return root.getGameAreaWidth() - GraphicsFormat.MAPCHIP_WIDTH * WaitTurnOrderParam.GRID_ROW_COUNT;
             }
 
             return 0;
@@ -1212,13 +1585,84 @@ var WaitTurnOrderManager = {
                 return 0;
             }
 
-            return root.getGameAreaHeight() - GraphicsFormat.MAPCHIP_HEIGHT * 2;
+            return root.getGameAreaHeight() - GraphicsFormat.MAPCHIP_HEIGHT * WaitTurnOrderParam.GRID_ROW_COUNT;
         },
 
-        _getWindowTextUI: function () {
-            return root.queryTextUI("default_window");
+        playSwitchSound: function () {
+            var category, name;
+
+            if (WaitTurnSoundParam.IS_SWITCHING_WT_ORDER_SOUND_ORIGINAL) {
+                category = WaitTurnSoundParam.MATERIAL_FOLDER_NAME;
+                name = WaitTurnSoundParam.SWITCHING_WT_ORDER_SOUND_FILE_NAME;
+                root.getMaterialManager().soundPlay(category, name, 0);
+            } else {
+                MediaControl.soundDirect("commandselect");
+            }
         }
     });
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        行動順リストの切り替え用にmodeを取得する関数を追加する
+    *----------------------------------------------------------------------------------------------------------------*/
+    SceneManager.getBattleSetupCycleMode = function () {
+        if (this._sceneType !== SceneType.BATTLESETUP) {
+            return 0;
+        }
+
+        return this._activeAcene.getCycleMode();
+    };
+
+    SceneManager.getPlayerTurnCycleMode = function () {
+        if (this._sceneType !== SceneType.FREE) {
+            return 0;
+        }
+
+        return this._activeAcene.getPlayerTurnCycleMode();
+    };
+
+    SceneManager.getMapEditMode = function () {
+        if (this._sceneType !== SceneType.FREE) {
+            return 0;
+        }
+
+        return this._activeAcene.getMapEditMode();
+    };
+
+    FreeAreaScene.getPlayerTurnCycleMode = function () {
+        if (this._playerTurnObject === null) {
+            return 0;
+        }
+
+        return this._playerTurnObject.getCycleMode();
+    };
+
+    FreeAreaScene.getMapEditMode = function () {
+        if (this._playerTurnObject === null) {
+            return 0;
+        }
+
+        return this._playerTurnObject.getMapEditMode();
+    };
+
+    PlayerTurn.getMapEditMode = function () {
+        if (this._mapEdit === null) {
+            return 0;
+        }
+
+        return this._mapEdit.getCycleMode();
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        行動順リストの切り替えを有効にする場合はCキーでユニットメニューが開かないようにする
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias3489032849023 = MapEdit._optionAction;
+    MapEdit._optionAction = function (unit) {
+        if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && IS_SWITCHING_WT_ORDER_ALLOWED) {
+            return MapEditResult.NONE;
+        }
+
+        return alias3489032849023.call(this, unit);
+    };
 
     /*-----------------------------------------------------------------------------------------------------------------
         行動順リスト内のユニットのキャラチップを強調表示するための関数を追加する
@@ -1311,6 +1755,25 @@ var WaitTurnOrderManager = {
         alias008.call(this);
 
         this.drawUILayer();
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        MapLayerクラスにmoveUILayerを追加する
+    *----------------------------------------------------------------------------------------------------------------*/
+    MapLayer.moveUILayer = function () {
+        var i;
+        var count = this._mapPartsArray.length;
+
+        for (i = 0; i < count; i++) {
+            this._mapPartsArray[i].moveMapParts();
+        }
+    };
+
+    var alias24890324890 = MapLayer.moveMapLayer;
+    MapLayer.moveMapLayer = function () {
+        this.moveUILayer();
+
+        return alias24890324890.call(this);
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -1468,9 +1931,17 @@ var WaitTurnOrderManager = {
         }
 
         if (orderNum === 1) {
-            iconPic.drawStretchParts(x - 4, y - 4, 20, 20, 0, 24 * 3, 24, 24);
+            this._drawIcon(x - 4, y - 4);
         } else {
             NumberRenderer.drawRightNumber(x, y - 4, orderNum);
+        }
+    };
+
+    MapLayer._drawIcon = function (x, y) {
+        if (WaitTurnImageParam.IS_AT_ICON_ORIGINAL) {
+            WaitTurnImageParam.atIconImage.drawStretchParts(x, y, 20, 20, 0, 0, 24, 24);
+        } else {
+            WaitTurnImageParam.atIconImage.drawStretchParts(x, y, 20, 20, 0, 24 * 3, 24, 24);
         }
     };
 
@@ -1496,7 +1967,7 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        マップの右端2列または下端2列にカーソルが侵入できないようにする（キーボード）
+        行動順リストの表示領域にカーソルが侵入できないようにする（キーボード）
     *----------------------------------------------------------------------------------------------------------------*/
     MapCursor._changeCursorValue = function (input) {
         var session = root.getCurrentSession();
@@ -1518,14 +1989,14 @@ var WaitTurnOrderManager = {
             xCursor = n;
         } else if (yCursor < n) {
             yCursor = n;
-        } else if (IS_WT_ORDER_LIST_LOCATED_RIGHT && xCursor > CurrentMap.getWidth() - 1 - 2) {
-            xCursor = CurrentMap.getWidth() - 1 - 2;
+        } else if (IS_WT_ORDER_LIST_LOCATED_RIGHT && xCursor > CurrentMap.getWidth() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT) {
+            xCursor = CurrentMap.getWidth() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT;
         } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && xCursor > CurrentMap.getWidth() - 1 - n) {
             xCursor = CurrentMap.getWidth() - 1 - n;
         } else if (IS_WT_ORDER_LIST_LOCATED_RIGHT && yCursor > CurrentMap.getHeight() - 1 - n) {
             yCursor = CurrentMap.getHeight() - 1 - n;
-        } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && yCursor > CurrentMap.getHeight() - 1 - 2) {
-            yCursor = CurrentMap.getHeight() - 1 - 2;
+        } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && yCursor > CurrentMap.getHeight() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT) {
+            yCursor = CurrentMap.getHeight() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT;
         } else {
             // カーソルが移動できたため、音を鳴らす
             this._playMovingSound();
@@ -1538,17 +2009,17 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        マップの右端2列または下端2列にカーソルが侵入できないようにする（マウス）
+        行動順リストの表示領域にカーソルが侵入できないようにする（マウス）
     *----------------------------------------------------------------------------------------------------------------*/
     MouseControl._adjustMapCursor = function () {
         var session = root.getCurrentSession();
         var xCursor = Math.floor((root.getMouseX() + session.getScrollPixelX() - root.getViewportX()) / GraphicsFormat.MAPCHIP_WIDTH);
         var yCursor = Math.floor((root.getMouseY() + session.getScrollPixelY() - root.getViewportY()) / GraphicsFormat.MAPCHIP_HEIGHT);
 
-        if (IS_WT_ORDER_LIST_LOCATED_RIGHT && xCursor > CurrentMap.getWidth() - 1 - 2) {
-            xCursor = CurrentMap.getWidth() - 1 - 2;
-        } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && yCursor > CurrentMap.getHeight() - 1 - 2) {
-            yCursor = CurrentMap.getHeight() - 1 - 2;
+        if (IS_WT_ORDER_LIST_LOCATED_RIGHT && xCursor > CurrentMap.getWidth() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT) {
+            xCursor = CurrentMap.getWidth() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT;
+        } else if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && yCursor > CurrentMap.getHeight() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT) {
+            yCursor = CurrentMap.getHeight() - 1 - WaitTurnOrderParam.GRID_ROW_COUNT;
         }
 
         root.getCurrentSession().setMapCursorX(xCursor);
@@ -1556,7 +2027,7 @@ var WaitTurnOrderManager = {
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        マップの右端2列または下端2列にユニットの移動範囲や攻撃範囲を示すパネルを表示しないようにする
+        行動順リストの表示領域にユニットの移動範囲や攻撃範囲を示すパネルを表示しないようにする
     *----------------------------------------------------------------------------------------------------------------*/
     MapChipLight.setIndexArray = function (indexArray) {
         this._indexArray = CDB_rebuildIndexArray(indexArray);
@@ -1615,7 +2086,7 @@ var WaitTurnOrderManager = {
         var yMax = root.getGameAreaHeight() - this._getWindowHeight() - yBase;
 
         if (!IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-            yMax -= GraphicsFormat.MAPCHIP_HEIGHT * 2;
+            yMax -= GraphicsFormat.MAPCHIP_HEIGHT * WaitTurnOrderParam.GRID_ROW_COUNT;
         }
 
         return y > d ? yMin : yMax;
@@ -1628,7 +2099,7 @@ var WaitTurnOrderManager = {
         var dx = LayoutControl.getRelativeX(10) - 54;
 
         if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-            return root.getGameAreaWidth() - this._getWindowWidth() - dx - GraphicsFormat.MAPCHIP_WIDTH * 2;
+            return root.getGameAreaWidth() - this._getWindowWidth() - dx - GraphicsFormat.MAPCHIP_WIDTH * WaitTurnOrderParam.GRID_ROW_COUNT;
         }
 
         return root.getGameAreaWidth() - this._getWindowWidth() - dx;
@@ -1645,7 +2116,7 @@ var WaitTurnOrderManager = {
             if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
                 return root.getGameAreaHeight() - this._getWindowHeight() - yBase;
             } else {
-                return root.getGameAreaHeight() - this._getWindowHeight() - yBase - GraphicsFormat.MAPCHIP_HEIGHT * 2;
+                return root.getGameAreaHeight() - this._getWindowHeight() - yBase - GraphicsFormat.MAPCHIP_HEIGHT * WaitTurnOrderParam.GRID_ROW_COUNT;
             }
         } else {
             return yBase;
@@ -1659,7 +2130,7 @@ var WaitTurnOrderManager = {
         var maxWidth = root.getGameAreaWidth();
 
         if (IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-            maxWidth -= GraphicsFormat.MAPCHIP_WIDTH * 2;
+            maxWidth -= GraphicsFormat.MAPCHIP_WIDTH * WaitTurnOrderParam.GRID_ROW_COUNT;
         }
 
         return this._getNormalizeValue(x, width, maxWidth, dx);
@@ -1669,14 +2140,14 @@ var WaitTurnOrderManager = {
         var maxHeight = root.getGameAreaHeight();
 
         if (!IS_WT_ORDER_LIST_LOCATED_RIGHT) {
-            maxHeight -= GraphicsFormat.MAPCHIP_HEIGHT * 2;
+            maxHeight -= GraphicsFormat.MAPCHIP_HEIGHT * WaitTurnOrderParam.GRID_ROW_COUNT;
         }
 
         return this._getNormalizeValue(y, height, maxHeight, dy);
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
-        コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にする
+        コンフィグの「敵ターンスキップ」「オートターンエンド」を非表示にし、「行動順ゲージのWT最大値」を追加する
     *----------------------------------------------------------------------------------------------------------------*/
     var alias014 = ConfigWindow._configureConfigItem;
     ConfigWindow._configureConfigItem = function (groupArray) {
@@ -1691,6 +2162,50 @@ var WaitTurnOrderManager = {
             } else if (obj.getConfigItemTitle() === StringTable.Config_AutoTurnSkip) {
                 groupArray.splice(i, 1);
             }
+        }
+
+        if (!IS_WT_ORDER_LIST_LOCATED_RIGHT && IS_SWITCHING_WT_ORDER_ALLOWED && IS_CONFIG_MAX_WT_ALLOWED) {
+            groupArray.push(ConfigItem.MaxWT);
+        }
+    };
+
+    ConfigItem.MaxWT = defineObject(BaseConfigtItem, {
+        selectFlag: function (index) {
+            root.getExternalData().env.maxWTIndex = index;
+        },
+
+        getFlagValue: function () {
+            if (typeof root.getExternalData().env.maxWTIndex !== "number") {
+                return 0;
+            }
+
+            return root.getExternalData().env.maxWTIndex;
+        },
+
+        getFlagCount: function () {
+            return WaitTurnOrderParam.MAX_WT_ARRAY.length;
+        },
+
+        getConfigItemTitle: function () {
+            return StringTable.Config_MaxWT;
+        },
+
+        getConfigItemDescription: function () {
+            return StringTable.Config_MaxWTDescription;
+        },
+
+        getObjectArray: function () {
+            return WaitTurnOrderParam.MAX_WT_STRING_ARRAY;
+        }
+    });
+
+    var alias58439058439 = ScriptCall_Setup;
+    ScriptCall_Setup = function () {
+        alias58439058439.call(this);
+        var env = root.getExternalData().env;
+
+        if (typeof env.maxWTIndex !== "number") {
+            env.maxWTIndex = WaitTurnOrderParam.MAX_WT_ARRAY.length - 1;
         }
     };
 
