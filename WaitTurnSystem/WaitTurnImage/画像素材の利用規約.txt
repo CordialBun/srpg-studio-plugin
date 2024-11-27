@@ -1,0 +1,4 @@
+【利用規約】
+・WaitTurnImageフォルダ内の画像ファイルはSRPG StudioのRTPの改変素材となっています。利用はSRPG Studioを使ったゲームに限ります。
+・改変、再配布等OKです。クレジット等は特に不要です。
+・SRPG Studioの利用規約は遵守してください。
