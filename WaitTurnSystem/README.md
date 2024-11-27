@@ -273,6 +273,21 @@ UI データの menuwindow のフォーマットに準拠した画像ファイ�
 
 <br>
 
+また、行動順リストのゲージ表示を使用する際は、[利用規約](https://raw.githubusercontent.com/CordialBun/srpg-studio-plugin/refs/heads/master/WaitTurnSystem/WaitTurnImage/%E7%94%BB%E5%83%8F%E7%B4%A0%E6%9D%90%E3%81%AE%E5%88%A9%E7%94%A8%E8%A6%8F%E7%B4%84.txt)を確認の上で、  
+プロジェクトの Material フォルダ配下に画像配置用のフォルダ（名前は MATERIAL_FOLDER_NAME に準拠）を作成し、  
+以下の画像をダウンロードして配置してください。
+
+[arrow.png](https://github.com/CordialBun/srpg-studio-plugin/blob/master/WaitTurnSystem/WaitTurnImage/arrow.png)
+[cursor.png](https://github.com/CordialBun/srpg-studio-plugin/blob/master/WaitTurnSystem/WaitTurnImage/cursor.png)
+
+<br>
+
+ダウンロードはリンク先のダウンロードボタン（下の画像の赤枠）からできます。
+
+![image](https://github.com/user-attachments/assets/ef4c3329-973f-4b02-99c8-126a7f1e254d)
+
+<br>
+
 ### 3.2. リソースの設定
 
 リソース使用箇所の「UI」→「自軍ターン」の画像を必要に応じて変更してください。
