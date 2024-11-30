@@ -52,9 +52,10 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
                     透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
 Ver.2.00 2024/11/30 ウェイトターンシステムとの併用に対応。
                     時戻し画面にユニットのキャラチップを表示する機能を追加。
+                    ターンステートのカスタムパラメータの巻き戻しに対応。
                     ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様を変更。
                     乱数の初期化をニューゲーム時にも行う仕様に変更。
-                    ターンステートのカスタムパラメータの巻き戻しに対応。
+                    マップとユニットのカスタムパラメータの巻き戻し可否の設定項目を削除。
                     ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
 
 
@@ -97,11 +98,6 @@ var CAN_REWIND_SWITCH_ID = 1;
 var APPEND_RECORD_SWITCH_ID = 2;
 // ゲームオーバー判定のグローバルスイッチのID
 var IS_GAME_OVER_SWITCH_ID = 3;
-
-// マップのカスパラを巻き戻す場合はtrue、巻き戻さない場合はfalse
-var IS_REWINDING_MAP_CUSTOM_ALLOWED = true;
-// ユニットのカスパラを巻き戻す場合はtrue、巻き戻さない場合はfalse
-var IS_REWINDING_UNIT_CUSTOM_ALLOWED = true;
 
 // 時戻し画面のレコード一覧ウィンドウのx座標
 var REWIND_TITLE_WINDOW_POS_X = 40;
@@ -1308,10 +1304,7 @@ var RewindTimeManager = {
         this.createConditionRecord(record, newLatestRecord, latestRecord.defeatConditionArray, isFirstRecord, false, curSession);
         this.createShopRecord(record, newLatestRecord, latestRecord.shopDataParamArray, isFirstRecord, curSession);
         this.createCurSeedRecord(record, newLatestRecord, latestRecord.curSeed, isFirstRecord);
-
-        if (IS_REWINDING_MAP_CUSTOM_ALLOWED) {
-            this.createMapCustomRecord(record, newLatestRecord, latestRecord.custom, isFirstRecord, curSession);
-        }
+        this.createMapCustomRecord(record, newLatestRecord, latestRecord.custom, isFirstRecord, curSession);
     },
 
     createUnitRecord: function (record, newLatestRecord, latestRecord, isFirstRecord) {
@@ -1461,10 +1454,7 @@ var RewindTimeManager = {
         this.createUnitIsBadStateGuardRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.isBadStateGuard, isFirstRecord);
         this.createUnitIsActionStopRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.isActionStop, isFirstRecord);
         this.createUnitIsSyncopeRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.isSyncope, isFirstRecord);
-
-        if (IS_REWINDING_UNIT_CUSTOM_ALLOWED) {
-            this.createUnitCustomRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.custom, isFirstRecord);
-        }
+        this.createUnitCustomRecord(unit, unitParam, newLatestUnitParam, latestUnitParam.custom, isFirstRecord);
     },
 
     createUnitIdRecord: function (unit, unitParam, newLatestUnitParam) {
