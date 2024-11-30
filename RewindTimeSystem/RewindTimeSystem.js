@@ -51,8 +51,10 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
                     ボーナスの巻き戻しが正常に動作しない不具合を修正。
                     透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
 Ver.1.40 2024/11/09 ウェイトターンシステムとの併用に対応。
-                    ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様変更。
                     時戻し画面にユニットのキャラチップを表示する機能を追加。
+                    ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様変更。
+                    ターンステートのカスタムパラメータの巻き戻しに対応。
+                    ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -220,7 +222,6 @@ var WaitTurnTalkCommandRecordTitleString = {
     時戻し処理を管理するオブジェクト
 *----------------------------------------------------------------------------------------------------------------*/
 var RewindTimeManager = {
-    _unitDict: null,
     _weaponList: null,
     _itemList: null,
     _skillList: null,
@@ -271,14 +272,8 @@ var RewindTimeManager = {
     },
 
     initParam: function (isStartMap) {
-        var i, count, unit;
         var globalCustom = this.getGlobalCustom();
         var baseData = root.getBaseData();
-        var playerList = PlayerList.getMainList();
-        var enemyList = EnemyList.getMainList();
-        var allyList = AllyList.getMainList();
-
-        this._unitDict = {};
         this._weaponList = baseData.getWeaponList();
         this._itemList = baseData.getItemList();
         this._skillList = baseData.getSkillList();
@@ -286,24 +281,6 @@ var RewindTimeManager = {
         this._classList = baseData.getClassList();
         this._fusionList = baseData.getFusionList();
         this._metamorphozeList = baseData.getMetamorphozeList();
-
-        count = playerList.getCount();
-        for (i = 0; i < count; i++) {
-            unit = playerList.getData(i);
-            this._unitDict[unit.getId()] = unit;
-        }
-
-        count = enemyList.getCount();
-        for (i = 0; i < count; i++) {
-            unit = enemyList.getData(i);
-            this._unitDict[unit.getId()] = unit;
-        }
-
-        count = allyList.getCount();
-        for (i = 0; i < count; i++) {
-            unit = allyList.getData(i);
-            this._unitDict[unit.getId()] = unit;
-        }
 
         this.initRecordArray(isStartMap, globalCustom);
         this.initBeforeChangedMapChipDict(isStartMap, false, globalCustom);
@@ -530,14 +507,10 @@ var RewindTimeManager = {
     },
 
     rewindAllUnit: function (unitParamArray) {
-        var key, i, count, unit, unitParam;
-        var unitDict = this._unitDict;
+        var i, count, unitParam;
 
-        // 一旦マップ上の全ユニットを消す
-        for (key in unitDict) {
-            unit = unitDict[key];
-            unit.setAliveState(AliveType.ERASE);
-        }
+        // マップ上の生存しているユニットを一旦全部消す
+        this.eraseAliveUnitInMap();
 
         count = unitParamArray.length;
         for (i = 0; i < count; i++) {
@@ -546,9 +519,66 @@ var RewindTimeManager = {
         }
     },
 
+    eraseAliveUnitInMap: function () {
+        var i, count, unit;
+        var playerList = PlayerList.getMainList();
+        var enemyList = EnemyList.getMainList();
+        var allyList = AllyList.getMainList();
+
+        count = playerList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = playerList.getData(i);
+
+            if (unit.aliveState === AliveType.ALIVE) {
+                unit.setAliveState(AliveType.ERASE);
+            }
+        }
+
+        count = enemyList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = enemyList.getData(i);
+
+            if (unit.aliveState === AliveType.ALIVE) {
+                unit.setAliveState(AliveType.ERASE);
+            }
+        }
+
+        count = allyList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = allyList.getData(i);
+
+            if (unit.aliveState === AliveType.ALIVE) {
+                unit.setAliveState(AliveType.ERASE);
+            }
+        }
+    },
+
+    getUnit: function (id, srcId) {
+        var unit = null;
+        var playerList = PlayerList.getMainList();
+        var enemyList = EnemyList.getMainList();
+        var allyList = AllyList.getMainList();
+
+        if (playerList.getDataFromId(id) !== null) {
+            unit = playerList.getDataFromId(id);
+        } else if (enemyList.getDataFromId(id) !== null) {
+            unit = enemyList.getDataFromId(id);
+        } else if (allyList.getDataFromId(id) !== null) {
+            unit = allyList.getDataFromId(id);
+        } else if (playerList.getDataFromId(srcId) !== null) {
+            unit = playerList.getDataFromId(srcId);
+        } else if (enemyList.getDataFromId(srcId) !== null) {
+            unit = enemyList.getDataFromId(srcId);
+        } else if (allyList.getDataFromId(srcId) !== null) {
+            unit = allyList.getDataFromId(srcId);
+        }
+
+        return unit;
+    },
+
     rewindUnit: function (unitParam) {
         var key;
-        var unit = this._unitDict[unitParam.id];
+        var unit = this.getUnit(unitParam.id, unitParam.srcId);
 
         for (key in unitParam) {
             switch (key) {
@@ -596,6 +626,7 @@ var RewindTimeManager = {
                     break;
                 case "unitType": // 所属
                     this.rewindUnitType(unit, unitParam.unitType);
+                    unit = this.getUnit(unitParam.id, unitParam.srcId);
                     break;
                 case "pos": // 座標
                     this.rewindUnitPos(unit, unitParam.pos);
@@ -724,14 +755,16 @@ var RewindTimeManager = {
     },
 
     rewindUnitStyle: function (unit, unitStyleParam) {
-        var fusion, opponentUnit, metamorphoze;
+        var fusion, opponentId, opponentSrcId, opponentUnit, metamorphoze;
         var unitStyle = unit.getUnitStyle();
 
         unitStyle.clearFusionInfo();
 
         if (unitStyleParam.isFusion) {
             fusion = this._fusionList.getDataFromId(unitStyleParam.fusionId);
-            opponentUnit = this._unitDict[unitStyleParam.opponentId];
+            opponentId = unitStyleParam.opponentId;
+            opponentSrcId = unitStyleParam.opponentSrcId;
+            opponentUnit = this.getUnit(opponentId, opponentSrcId);
 
             if (unitStyleParam.isParent) {
                 unitStyle.setFusionChild(opponentUnit);
@@ -755,6 +788,7 @@ var RewindTimeManager = {
     rewindUnitType: function (unit, unitType) {
         var generator = root.getEventGenerator();
         generator.unitAssign(unit, unitType);
+        generator.execute();
     },
 
     rewindUnitPos: function (unit, pos) {
@@ -1172,6 +1206,8 @@ var RewindTimeManager = {
 
                 if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
                     record.unitId = atUnit.getId();
+                    record.unitSrcId = atUnit.getImportSrcId();
+                    record.unitColorIndex = atUnit.getUnitType();
                 }
             } else {
                 record.unitName = "";
@@ -1188,6 +1224,8 @@ var RewindTimeManager = {
 
                 if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
                     record.unitId = unit.getId();
+                    record.unitSrcId = unit.getImportSrcId();
+                    record.unitColorIndex = unit.getUnitType();
                 }
             } else {
                 record.unitName = "";
@@ -1257,20 +1295,35 @@ var RewindTimeManager = {
     },
 
     createUnitRecord: function (record, newLatestRecord, latestRecord, isFirstRecord) {
-        var key, unit, unitParam, newLatestUnitParam, latestUnitParam;
+        var i, count, unit, id, srcId, unitParam, newLatestUnitParam, latestUnitParam;
         var unitParamArray = [];
         var newLatestUnitParamDict = {};
         var latestUnitParamDict = this._latestRecord.unitParamDict;
-        var unitDict = this._unitDict;
+        var playerList = PlayerList.getMainList();
+        var enemyList = EnemyList.getMainList();
+        var allyList = AllyList.getMainList();
 
-        for (key in unitDict) {
-            unit = unitDict[key];
+        count = playerList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = playerList.getData(i);
+            id = unit.getId();
+            srcId = unit.getImportSrcId();
             unitParam = {};
             newLatestUnitParam = {};
             latestUnitParam = {};
 
             if (latestUnitParamDict !== undefined) {
-                latestUnitParam = latestUnitParamDict[key];
+                // 通常、getImportSrcIdの戻り値は-1だが、自軍ユニットを敵(同盟)として作成した場合は以下のようになる
+                // 敵(同盟)軍のとき：自軍としてのID
+                // 自軍のとき：敵(同盟)軍としてのID
+                // unitParamDictに格納する際はユニット1体につき1種類のIDをkeyとして対応させたいので、
+                // getImportSrcIdの戻り値が-1でないとき、つまり敵(同盟)として作成された自軍ユニットは
+                // idとsrcIdの小さい方(自軍としてのID)をkeyに割り当てるようにする
+                if (srcId !== -1) {
+                    latestUnitParam = latestUnitParamDict[Math.min(id, srcId)];
+                } else {
+                    latestUnitParam = latestUnitParamDict[id];
+                }
 
                 if (latestUnitParam === undefined) {
                     latestUnitParam = {};
@@ -1280,7 +1333,76 @@ var RewindTimeManager = {
             this.createUnitParam(unit, unitParam, newLatestUnitParam, latestUnitParam, isFirstRecord);
 
             unitParamArray.push(unitParam);
-            newLatestUnitParamDict[key] = newLatestUnitParam;
+
+            if (srcId !== -1) {
+                newLatestUnitParamDict[Math.min(id, srcId)] = newLatestUnitParam;
+            } else {
+                newLatestUnitParamDict[id] = newLatestUnitParam;
+            }
+        }
+
+        count = enemyList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = enemyList.getData(i);
+            id = unit.getId();
+            srcId = unit.getImportSrcId();
+            unitParam = {};
+            newLatestUnitParam = {};
+            latestUnitParam = {};
+
+            if (latestUnitParamDict !== undefined) {
+                if (srcId !== -1) {
+                    latestUnitParam = latestUnitParamDict[Math.min(id, srcId)];
+                } else {
+                    latestUnitParam = latestUnitParamDict[id];
+                }
+
+                if (latestUnitParam === undefined) {
+                    latestUnitParam = {};
+                }
+            }
+
+            this.createUnitParam(unit, unitParam, newLatestUnitParam, latestUnitParam, isFirstRecord);
+
+            unitParamArray.push(unitParam);
+
+            if (srcId !== -1) {
+                newLatestUnitParamDict[Math.min(id, srcId)] = newLatestUnitParam;
+            } else {
+                newLatestUnitParamDict[id] = newLatestUnitParam;
+            }
+        }
+
+        count = allyList.getCount();
+        for (i = 0; i < count; i++) {
+            unit = allyList.getData(i);
+            id = unit.getId();
+            srcId = unit.getImportSrcId();
+            unitParam = {};
+            newLatestUnitParam = {};
+            latestUnitParam = {};
+
+            if (latestUnitParamDict !== undefined) {
+                if (srcId !== -1) {
+                    latestUnitParam = latestUnitParamDict[Math.min(id, srcId)];
+                } else {
+                    latestUnitParam = latestUnitParamDict[id];
+                }
+
+                if (latestUnitParam === undefined) {
+                    latestUnitParam = {};
+                }
+            }
+
+            this.createUnitParam(unit, unitParam, newLatestUnitParam, latestUnitParam, isFirstRecord);
+
+            unitParamArray.push(unitParam);
+
+            if (srcId !== -1) {
+                newLatestUnitParamDict[Math.min(id, srcId)] = newLatestUnitParam;
+            } else {
+                newLatestUnitParamDict[id] = newLatestUnitParam;
+            }
         }
 
         record.unitParamArray = unitParamArray;
@@ -1327,6 +1449,7 @@ var RewindTimeManager = {
 
     createUnitIdRecord: function (unit, unitParam, newLatestUnitParam) {
         unitParam.id = unit.getId();
+        unitParam.srcId = unit.getImportSrcId();
         newLatestUnitParam.id = unitParam.id;
     },
 
@@ -1533,6 +1656,7 @@ var RewindTimeManager = {
             fusionId: 0,
             isParent: false,
             opponentId: 0,
+            opponentSrcId: 0,
             isMetamorphoze: false,
             metamorphozeId: 0,
             metamorphozeTurn: 0,
@@ -1548,9 +1672,11 @@ var RewindTimeManager = {
             if (unitStyle.getFusionParent() === null) {
                 unitStyleParam.isParent = true;
                 unitStyleParam.opponentId = unitStyle.getFusionChild().getId();
+                unitStyleParam.opponentSrcId = unitStyle.getFusionChild().getImportSrcId();
             } else {
                 unitStyleParam.isParent = false;
                 unitStyleParam.opponentId = unitStyle.getFusionParent().getId();
+                unitStyleParam.opponentSrcId = unitStyle.getFusionParent().getImportSrcId();
             }
         }
 
@@ -1565,6 +1691,7 @@ var RewindTimeManager = {
         newLatestUnitStyleParam.fusionId = unitStyleParam.fusionId;
         newLatestUnitStyleParam.isParent = unitStyleParam.isParent;
         newLatestUnitStyleParam.opponentId = unitStyleParam.opponentId;
+        newLatestUnitStyleParam.opponentSrcId = unitStyleParam.opponentSrcId;
         newLatestUnitStyleParam.isMetamorphoze = unitStyleParam.isMetamorphoze;
         newLatestUnitStyleParam.metamorphozeId = unitStyleParam.metamorphozeId;
         newLatestUnitStyleParam.metamorphozeTurn = unitStyleParam.metamorphozeTurn;
@@ -2440,14 +2567,6 @@ var RewindTimeManager = {
         newLatestRecord.custom = JSONParser.parse(customText);
     },
 
-    addUnit: function (unit) {
-        if (unit === null) {
-            return;
-        }
-
-        this._unitDict[unit.getId()] = unit;
-    },
-
     addBeforeChangedMapChip: function (latestHandleParam, isLayer) {
         var x, y, key;
         var beforeChangedMapChipDict;
@@ -2480,7 +2599,8 @@ var RewindTimeManager = {
     },
 
     getRecordTitleArray: function () {
-        var i, count, record, recordType, actionType, unitName, unitId, unit, text, recordTitle, placeCommandName, talkCommandName;
+        var i, count, record, recordType, actionType, unitName, unitId, unitSrcId, unitColorIndex;
+        var unit, text, recordTitle, placeCommandName, talkCommandName;
         var recordTitleArray = [];
         var recordArray = this._recordArray;
         var recordTitleString = WAIT_TURN_SYSTEM_COEXISTS ? WaitTurnRecordTitleString : RecordTitleString;
@@ -2496,6 +2616,8 @@ var RewindTimeManager = {
             talkCommandName = this.getTalkCommandName();
             unitName = record.unitName;
             unitId = record.unitId;
+            unitSrcId = record.unitSrcId;
+            unitColorIndex = record.unitColorIndex;
 
             if (recordType === RecordType.UNIT_PLACECOMMAND) {
                 text = unitName + placeCommandRecordTitleString[placeCommandName];
@@ -2515,15 +2637,17 @@ var RewindTimeManager = {
                 text += " -> " + recordTitleString[actionType];
             }
 
-            if (typeof unitId === "number" && this._unitDict[unitId] !== undefined) {
-                unit = this._unitDict[unitId];
+            if (typeof unitId === "number" && typeof unitSrcId === "number" && this.getUnit(unitId, unitSrcId) !== null) {
+                unit = this.getUnit(unitId, unitSrcId);
             } else {
                 unit = null;
             }
 
             recordTitle = {
                 _title: text,
-                _unit: unit,
+                _unitId: unit === null ? -1 : unitId,
+                _unitSrcId: unit === null ? -1 : unitSrcId,
+                _unitColorIndex: unit === null ? -1 : unitColorIndex,
                 _isTurnStart: recordType === RecordType.TURN_START,
                 _isLatest: i === count - 1,
 
@@ -2531,8 +2655,16 @@ var RewindTimeManager = {
                     return this._title;
                 },
 
-                getUnit: function () {
-                    return this._unit;
+                getUnitId: function () {
+                    return this._unitId;
+                },
+
+                getUnitSrcId: function () {
+                    return this._unitSrcId;
+                },
+
+                getUnitColorIndex: function () {
+                    return this._unitColorIndex;
                 },
 
                 isTurnStart: function () {
@@ -3422,32 +3554,6 @@ var GetNumberTokenStateType = {
         }
 
         return root.createResourceHandle(isRuntime, graphicsId, colorIndex, 0, 0);
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        ユニット登場時の処理
-    *----------------------------------------------------------------------------------------------------------------*/
-    var alias000 = ScriptCall_AppearEventUnit;
-    ScriptCall_AppearEventUnit = function (unit) {
-        alias000.call(this, unit);
-
-        if (root.getCurrentScene() === SceneType.EVENT) {
-            RewindTimeManager.addUnit(unit);
-        }
-    };
-
-    /*-----------------------------------------------------------------------------------------------------------------
-        援軍出現時の処理
-    *----------------------------------------------------------------------------------------------------------------*/
-    var alias001 = ReinforcementChecker._appearUnit;
-    ReinforcementChecker._appearUnit = function (pageData, x, y) {
-        var unit = alias001.call(this, pageData, x, y);
-
-        if (unit !== null) {
-            RewindTimeManager.addUnit(unit);
-        }
-
-        return unit;
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
@@ -4461,7 +4567,7 @@ var GetNumberTokenStateType = {
         },
 
         drawScrollContent: function (x, y, object, isSelect, index) {
-            var color;
+            var color, unit, unitRenderParam;
             var count = this.getObjectCount();
             var textui = this.getParentTextUI();
             var font = textui.getFont();
@@ -4476,8 +4582,11 @@ var GetNumberTokenStateType = {
                 color = ColorValue.DEFAULT;
             }
 
-            if (object.getUnit() !== null) {
-                UnitRenderer.drawDefaultUnit(object.getUnit(), x, y - 4, null);
+            if (object.getUnitId() !== -1) {
+                unit = RewindTimeManager.getUnit(object.getUnitId(), object.getUnitSrcId());
+                unitRenderParam = StructureBuilder.buildUnitRenderParam();
+                unitRenderParam.colorIndex = object.getUnitColorIndex();
+                UnitRenderer.drawDefaultUnit(unit, x, y - 4, unitRenderParam);
                 x += 32;
             }
 
@@ -4509,10 +4618,9 @@ var GetNumberTokenStateType = {
             for (i = 0; i < count; i++) {
                 object = this.getObjectFromIndex(i);
                 text = object.getTitle();
-                unit = object.getUnit();
                 width = TextRenderer.getTextWidth(text, font);
 
-                if (unit !== null) {
+                if (object.getUnitId() !== -1) {
                     width += 32;
                 }
 
