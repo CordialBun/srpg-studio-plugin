@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-時戻しシステム Ver.1.40
+時戻しシステム Ver.2.00
 
 
 【概要】
@@ -27,7 +27,7 @@ https://github.com/CordialBun/srpg-studio-plugin/tree/master/RewindTimeSystem#re
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.303
+SRPG Studio version:1.304
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -50,9 +50,9 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
                     巻き戻し画面の確認ウィンドウに指カーソルが表示されない不具合を修正。
                     ボーナスの巻き戻しが正常に動作しない不具合を修正。
                     透過レイヤーと非透過レイヤーのマップチップを同時に変更したとき、巻き戻しが正常に動作しない場合がある不具合を修正。
-Ver.1.40 2024/11/09 ウェイトターンシステムとの併用に対応。
+Ver.2.00 2024/11/30 ウェイトターンシステムとの併用に対応。
                     時戻し画面にユニットのキャラチップを表示する機能を追加。
-                    ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様変更。
+                    ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様を変更。
                     乱数の初期化をニューゲーム時にも行う仕様に変更。
                     ターンステートのカスタムパラメータの巻き戻しに対応。
                     ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
@@ -93,7 +93,7 @@ var REMAIN_COUNT_LIMITLESS_TEXT = "∞";
 var IS_REWIND_COMMAND_DISPLAYABLE_SWITCH_ID = 0;
 // 時戻しコマンド使用可のグローバルスイッチID
 var CAN_REWIND_SWITCH_ID = 1;
-// 自軍ユニット行動後判定のグローバルスイッチID
+// 自軍ユニット行動後判定のグローバルスイッチID(ウェイトターンシステム併用時は設定不要)
 var APPEND_RECORD_SWITCH_ID = 2;
 // ゲームオーバー判定のグローバルスイッチのID
 var IS_GAME_OVER_SWITCH_ID = 3;
@@ -817,6 +817,10 @@ var RewindTimeManager = {
             turnState.setRemovalCount(turnStateParam.removalCount);
             copiedCustom = JSONParser.deepCopy(turnStateParam.custom);
 
+            for (key in turnState.custom) {
+                delete turnState.custom[key];
+            }
+
             for (key in copiedCustom) {
                 turnState.custom[key] = copiedCustom[key];
             }
@@ -1216,9 +1220,15 @@ var RewindTimeManager = {
 
             if (this._recordArray.length > 0) {
                 this._recordArray[this._recordArray.length - 1].actionType = this.getCurRecordType();
+
+                if (this.getCurRecordType() === RecordType.UNIT_PLACECOMMAND) {
+                    this._recordArray[this._recordArray.length - 1].placeCommandName = this.getPlaceCommandName();
+                } else if (this.getCurRecordType() === RecordType.UNIT_TALK) {
+                    this._recordArray[this._recordArray.length - 1].talkCommandName = this.getTalkCommandName();
+                }
             }
         } else {
-            unit = this._curActionUnit;
+            unit = this.getCurActionUnit();
 
             if (recordType !== RecordType.TURN_START && unit !== null) {
                 record.unitName = unit.getName();
@@ -1231,13 +1241,22 @@ var RewindTimeManager = {
             } else {
                 record.unitName = "";
             }
+
+            if (recordType === RecordType.UNIT_PLACECOMMAND) {
+                record.placeCommandName = this.getPlaceCommandName();
+            } else if (recordType === RecordType.UNIT_TALK) {
+                record.talkCommandName = this.getTalkCommandName();
+            }
         }
 
         this.createRecord(record, newLatestRecord);
         this._recordArray.push(record);
         this._latestRecord = newLatestRecord;
         this.setCurRecordType(RecordType.UNIT_WAIT);
-        this.setCurActionUnit(null);
+
+        if (!WAIT_TURN_SYSTEM_COEXISTS) {
+            this.setCurActionUnit(null);
+        }
     },
 
     updateLatestRecord: function () {
@@ -2613,29 +2632,35 @@ var RewindTimeManager = {
             record = recordArray[i];
             recordType = record.recordType;
             actionType = record.actionType;
-            placeCommandName = this.getPlaceCommandName();
-            talkCommandName = this.getTalkCommandName();
+            placeCommandName = record.placeCommandName;
+            talkCommandName = record.talkCommandName;
             unitName = record.unitName;
             unitId = record.unitId;
             unitSrcId = record.unitSrcId;
             unitColorIndex = record.unitColorIndex;
 
-            if (recordType === RecordType.UNIT_PLACECOMMAND) {
-                text = unitName + placeCommandRecordTitleString[placeCommandName];
-            } else if (recordType === RecordType.UNIT_TALK) {
-                text = unitName + talkCommandRecordTitleString[talkCommandName];
+            if (WAIT_TURN_SYSTEM_COEXISTS) {
+                text = unitName + recordTitleString[RecordType.PLAYER_AT_START] + record.atCount;
+
+                if (typeof actionType === "number") {
+                    if (actionType === RecordType.UNIT_PLACECOMMAND && typeof placeCommandName === "string") {
+                        text += " -> " + placeCommandRecordTitleString[placeCommandName];
+                    } else if (actionType === RecordType.UNIT_TALK && typeof talkCommandName === "string") {
+                        text += " -> " + talkCommandRecordTitleString[talkCommandName];
+                    } else {
+                        text += " -> " + recordTitleString[actionType];
+                    }
+                }
             } else {
-                text = unitName + recordTitleString[recordType];
-            }
-
-            if (recordType === RecordType.TURN_START) {
-                text = record.turnCount + text;
-            } else if (WAIT_TURN_SYSTEM_COEXISTS && recordType === RecordType.PLAYER_AT_START) {
-                text += record.atCount;
-            }
-
-            if (WAIT_TURN_SYSTEM_COEXISTS && typeof actionType === "number") {
-                text += " -> " + recordTitleString[actionType];
+                if (recordType === RecordType.TURN_START) {
+                    text = record.turnCount + recordTitleString[recordType];
+                } else if (recordType === RecordType.UNIT_PLACECOMMAND && typeof placeCommandName === "string") {
+                    text = unitName + placeCommandRecordTitleString[placeCommandName];
+                } else if (recordType === RecordType.UNIT_TALK && typeof talkCommandName === "string") {
+                    text = unitName + talkCommandRecordTitleString[talkCommandName];
+                } else {
+                    text = unitName + recordTitleString[recordType];
+                }
             }
 
             if (typeof unitId === "number" && typeof unitSrcId === "number" && this.getUnit(unitId, unitSrcId) !== null) {
@@ -3509,9 +3534,9 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         ニューゲーム時に乱数を初期化する
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias5829430583290 = TitleCommand.NewGame._doEndAction;
+    var alias000 = TitleCommand.NewGame._doEndAction;
     TitleCommand.NewGame._doEndAction = function () {
-        alias5829430583290.call(this);
+        alias000.call(this);
 
         if (Probability.existCurSeed()) {
             return;
@@ -3523,9 +3548,9 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         マップテスト用の乱数初期化処理
     *----------------------------------------------------------------------------------------------------------------*/
-    var alias43821908490 = ScriptCall_Enter;
+    var alias001 = ScriptCall_Enter;
     ScriptCall_Enter = function (sceneType, commandType) {
-        var result = alias43821908490.call(this, sceneType, commandType);
+        var result = alias001.call(this, sceneType, commandType);
 
         if (!root.isTestPlay() || Probability.existCurSeed() || sceneType !== SceneType.BATTLESETUP) {
             return result;
@@ -3790,50 +3815,52 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         自軍ユニットの行動終了時にレコード追加のフラグを立てる
     *----------------------------------------------------------------------------------------------------------------*/
-    MapSequenceCommand._moveCommand = function () {
-        var result, switchTable, index;
+    if (!WAIT_TURN_SYSTEM_COEXISTS) {
+        MapSequenceCommand._moveCommand = function () {
+            var result, switchTable, index;
 
-        if (this._unitCommandManager.moveListCommandManager() !== MoveResult.CONTINUE) {
-            result = this._doLastAction();
-            if (result === 0) {
-                // 行動終了時(ユニット生存)
-                this._straightFlow.enterStraightFlow();
-                this.changeCycleMode(MapSequenceCommandMode.FLOW);
-            } else if (result === 1) {
-                // 行動終了時(ユニット死亡)
+            if (this._unitCommandManager.moveListCommandManager() !== MoveResult.CONTINUE) {
+                result = this._doLastAction();
+                if (result === 0) {
+                    // 行動終了時(ユニット生存)
+                    this._straightFlow.enterStraightFlow();
+                    this.changeCycleMode(MapSequenceCommandMode.FLOW);
+                } else if (result === 1) {
+                    // 行動終了時(ユニット死亡)
+                    switchTable = root.getMetaSession().getGlobalSwitchTable();
+                    index = switchTable.getSwitchIndexFromId(APPEND_RECORD_SWITCH_ID);
+                    switchTable.setSwitch(index, true);
+                    RewindTimeManager.setCurActionUnit(this._targetUnit);
+
+                    return MapSequenceCommandResult.COMPLETE;
+                } else {
+                    // 行動キャンセル時
+                    this._targetUnit.setMostResentMov(0);
+                    return MapSequenceCommandResult.CANCEL;
+                }
+            }
+
+            return MapSequenceCommandResult.NONE;
+        };
+
+        MapSequenceCommand._moveFlow = function () {
+            var switchTable, index;
+
+            if (this._straightFlow.moveStraightFlow() !== MoveResult.CONTINUE) {
+                // 再移動とオートターンエンドが有効な場合に、範囲が残ってしまうのを防ぐ
+                this._parentTurnObject.clearPanelRange();
+
                 switchTable = root.getMetaSession().getGlobalSwitchTable();
                 index = switchTable.getSwitchIndexFromId(APPEND_RECORD_SWITCH_ID);
                 switchTable.setSwitch(index, true);
                 RewindTimeManager.setCurActionUnit(this._targetUnit);
 
                 return MapSequenceCommandResult.COMPLETE;
-            } else {
-                // 行動キャンセル時
-                this._targetUnit.setMostResentMov(0);
-                return MapSequenceCommandResult.CANCEL;
             }
-        }
 
-        return MapSequenceCommandResult.NONE;
-    };
-
-    MapSequenceCommand._moveFlow = function () {
-        var switchTable, index;
-
-        if (this._straightFlow.moveStraightFlow() !== MoveResult.CONTINUE) {
-            // 再移動とオートターンエンドが有効な場合に、範囲が残ってしまうのを防ぐ
-            this._parentTurnObject.clearPanelRange();
-
-            switchTable = root.getMetaSession().getGlobalSwitchTable();
-            index = switchTable.getSwitchIndexFromId(APPEND_RECORD_SWITCH_ID);
-            switchTable.setSwitch(index, true);
-            RewindTimeManager.setCurActionUnit(this._targetUnit);
-
-            return MapSequenceCommandResult.COMPLETE;
-        }
-
-        return MapSequenceCommandResult.NONE;
-    };
+            return MapSequenceCommandResult.NONE;
+        };
+    }
 
     /*-----------------------------------------------------------------------------------------------------------------
         マップコマンド「時戻し」の実装
