@@ -53,6 +53,7 @@ Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変
 Ver.1.40 2024/11/09 ウェイトターンシステムとの併用に対応。
                     時戻し画面にユニットのキャラチップを表示する機能を追加。
                     ユニットの登場コマンド使用時にスクリプトの実行でaddUnitByIdを呼び出さなくてもいいよう仕様変更。
+                    乱数の初期化をニューゲーム時にも行う仕様に変更。
                     ターンステートのカスタムパラメータの巻き戻しに対応。
                     ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
 
@@ -3497,6 +3498,42 @@ var GetNumberTokenStateType = {
         var globalCustom = root.getMetaSession().global;
 
         globalCustom.curSeed = curSeed;
+    };
+
+    Probability.existCurSeed = function () {
+        var curSeed = this.getCurSeed();
+
+        return typeof curSeed === "number";
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        ニューゲーム時に乱数を初期化する
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias5829430583290 = TitleCommand.NewGame._doEndAction;
+    TitleCommand.NewGame._doEndAction = function () {
+        alias5829430583290.call(this);
+
+        if (Probability.existCurSeed()) {
+            return;
+        }
+
+        Probability.initSeed();
+    };
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        マップテスト用の乱数初期化処理
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias43821908490 = ScriptCall_Enter;
+    ScriptCall_Enter = function (sceneType, commandType) {
+        var result = alias43821908490.call(this, sceneType, commandType);
+
+        if (!root.isTestPlay() || Probability.existCurSeed() || sceneType !== SceneType.BATTLESETUP) {
+            return result;
+        }
+
+        Probability.initSeed();
+
+        return result;
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
