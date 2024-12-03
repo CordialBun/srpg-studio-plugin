@@ -965,7 +965,7 @@ var RewindTimeManager = {
         for (i = 0; i < count; i++) {
             variableParam = variableParamArray[i];
             variableTable = metaSession.getVariableTable(variableParam.col);
-            index = variableTable.getVariableIndexFromId(variableParam.id);
+            index = variableTable.getVariableIndexFromId(variableParam.index);
             variableTable.setVariable(index, variableParam.value);
         }
     },
