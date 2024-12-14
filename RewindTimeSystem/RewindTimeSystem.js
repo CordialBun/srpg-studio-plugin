@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-時戻しシステム Ver.2.01
+時戻しシステム Ver.2.02
 
 
 【概要】
@@ -58,6 +58,7 @@ Ver.2.00 2024/11/30 ウェイトターンシステムとの併用に対応。
                     マップとユニットのカスタムパラメータの巻き戻し可否の設定項目を削除。
                     ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
 Ver.2.01 2024/12/05 変数の巻き戻しが正常に動作しない不具合を修正。
+Ver.2.02 2024/12/14 ウェイトターンシステムと併用時にマップセーブを行うとレコードの保存と読み込みが正常に動作しなくなる不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -3434,39 +3435,43 @@ var GetNumberTokenStateType = {
     /*-----------------------------------------------------------------------------------------------------------------
         ロード時にRewindTimeManagerのプロパティを初期化する
     *----------------------------------------------------------------------------------------------------------------*/
-    LoadSaveScreen._executeLoad = function () {
-        var object = this._scrollbar.getObject();
+    if (!WAIT_TURN_SYSTEM_COEXISTS) {
+        LoadSaveScreen._executeLoad = function () {
+            var object = this._scrollbar.getObject();
 
-        if (object.isCompleteFile() || object.getMapInfo() !== null) {
-            SceneManager.setEffectAllRange(true);
+            if (object.isCompleteFile() || object.getMapInfo() !== null) {
+                SceneManager.setEffectAllRange(true);
 
-            // 内部でroot.changeSceneが呼ばれ、セーブファイルに記録されているシーンに変更される。
-            root.getLoadSaveManager().loadFile(this._scrollbar.getIndex());
-            if (root.getBaseScene() === SceneType.FREE) {
-                RewindTimeManager.loadData();
+                // 内部でroot.changeSceneが呼ばれ、セーブファイルに記録されているシーンに変更される。
+                root.getLoadSaveManager().loadFile(this._scrollbar.getIndex());
+                if (root.getBaseScene() === SceneType.FREE) {
+                    RewindTimeManager.loadData();
+                }
             }
-        }
-    };
+        };
+    }
 
     /*-----------------------------------------------------------------------------------------------------------------
         セーブ時に一部のプロパティをカスパラに保存する
         動作を軽量化するため、セーブ処理が終わったら当該カスパラはdeleteする
     *----------------------------------------------------------------------------------------------------------------*/
-    LoadSaveScreen._executeSave = function () {
-        var index = this._scrollbar.getIndex();
+    if (!WAIT_TURN_SYSTEM_COEXISTS) {
+        LoadSaveScreen._executeSave = function () {
+            var index = this._scrollbar.getIndex();
 
-        if (root.getBaseScene() === SceneType.FREE) {
-            RewindTimeManager.saveData();
-        }
+            if (root.getBaseScene() === SceneType.FREE) {
+                RewindTimeManager.saveData();
+            }
 
-        root.getLoadSaveManager().saveFile(index, this._screenParam.scene, this._screenParam.mapId, this._getCustomObject());
+            root.getLoadSaveManager().saveFile(index, this._screenParam.scene, this._screenParam.mapId, this._getCustomObject());
 
-        if (root.getBaseScene() === SceneType.FREE) {
-            RewindTimeManager.deleteGlobalCustomProp("recordArrayJSON");
-            RewindTimeManager.deleteGlobalCustomProp("beforeChangedMapChipDictJSON");
-            RewindTimeManager.deleteGlobalCustomProp("beforeChangedLayerMapChipDictJSON");
-        }
-    };
+            if (root.getBaseScene() === SceneType.FREE) {
+                RewindTimeManager.deleteGlobalCustomProp("recordArrayJSON");
+                RewindTimeManager.deleteGlobalCustomProp("beforeChangedMapChipDictJSON");
+                RewindTimeManager.deleteGlobalCustomProp("beforeChangedLayerMapChipDictJSON");
+            }
+        };
+    }
 
     /*-----------------------------------------------------------------------------------------------------------------
         擬似乱数を実装する
