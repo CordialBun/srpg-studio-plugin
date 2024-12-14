@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「ウェイトターンシステム」 Ver.3.01
+「ウェイトターンシステム」 Ver.3.02
 
 【概要】
 ウェイトターンシステムは、ユニットの速さや所持アイテムの重量などから算出される待機時間(ウェイトターン)によって
@@ -58,6 +58,7 @@ Ver.3.00 2024/11/27 拡張機能「ディレイアタック」を追加。
                     行動順リストのレイアウト設定の自由度を向上。
                     行動順リストを画面下に表示しているとき、戦闘やアイテム使用の予測ウィンドウが行動順リストと重なってしまう不具合を修正。
 Ver.3.01 2024/12/01 ユニットの装備武器の重量のみ参照する設定のとき、ユニットが装備可能な武器を所持していないとエラー落ちする不具合を修正。
+Ver.3.02 2024/12/14 時戻しシステムと併用時にマップセーブを行うと経過WTの記録や行動順リストの再構築が正常に動作しなくなる不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -65,6 +66,9 @@ Ver.3.01 2024/12/01 ユニットの装備武器の重量のみ参照する設定
 /*-----------------------------------------------------------------------------------------------------------------
     設定項目
 *----------------------------------------------------------------------------------------------------------------*/
+// 時戻しシステムと併用する場合はtrue、しない場合はfalse
+var REWIND_TIME_SYSTEM_COEXISTS = false;
+
 // 重量計算でユニットの所持アイテム全てを参照する場合はtrue、装備武器のみ参照する場合はfalse
 var IS_ALL_BELONGINGS_APPLICABLE = true;
 
@@ -776,6 +780,10 @@ var WaitTurnOrderManager = {
 
             if (root.getCurrentScene() === SceneType.FREE) {
                 WaitTurnOrderManager.rebuildList();
+
+                if (REWIND_TIME_SYSTEM_COEXISTS) {
+                    RewindTimeManager.loadData();
+                }
             }
         }
     };
@@ -2338,7 +2346,17 @@ var WaitTurnOrderManager = {
             }
         }
 
+        if (REWIND_TIME_SYSTEM_COEXISTS && root.getBaseScene() === SceneType.FREE) {
+            RewindTimeManager.saveData();
+        }
+
         root.getLoadSaveManager().saveFile(index, this._screenParam.scene, this._screenParam.mapId, customObject);
+
+        if (REWIND_TIME_SYSTEM_COEXISTS && root.getBaseScene() === SceneType.FREE) {
+            RewindTimeManager.deleteGlobalCustomProp("recordArrayJSON");
+            RewindTimeManager.deleteGlobalCustomProp("beforeChangedMapChipDictJSON");
+            RewindTimeManager.deleteGlobalCustomProp("beforeChangedLayerMapChipDictJSON");
+        }
     };
 
     /*-----------------------------------------------------------------------------------------------------------------
