@@ -59,6 +59,7 @@ Ver.3.00 2024/11/27 拡張機能「ディレイアタック」を追加。
                     行動順リストを画面下に表示しているとき、戦闘やアイテム使用の予測ウィンドウが行動順リストと重なってしまう不具合を修正。
 Ver.3.01 2024/12/01 ユニットの装備武器の重量のみ参照する設定のとき、ユニットが装備可能な武器を所持していないとエラー落ちする不具合を修正。
 Ver.3.02 2024/12/14 時戻しシステムと併用時にマップセーブを行うと経過WTの記録や行動順リストの再構築が正常に動作しなくなる不具合を修正。
+                    自軍ユニットのアタックターン中にそのユニットが撃破されたとき、WT値の更新が正常に動作しなくなる不具合を修正。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -1052,7 +1053,7 @@ var WaitTurnOrderManager = {
 
         atUnit = WaitTurnOrderManager.getATUnit();
 
-        if (!StateControl.isTargetControllable(atUnit) || atUnit.isWait()) {
+        if (!StateControl.isTargetControllable(atUnit) || atUnit.isWait() || atUnit.getAliveState() !== AliveType.ALIVE) {
             isTurnEnd = true;
         }
 
