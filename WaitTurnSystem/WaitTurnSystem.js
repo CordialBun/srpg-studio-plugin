@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-「ウェイトターンシステム」 Ver.3.02
+「ウェイトターンシステム」 Ver.3.10
 
 【概要】
 ウェイトターンシステムは、ユニットの速さや所持アイテムの重量などから算出される待機時間(ウェイトターン)によって
@@ -21,7 +21,7 @@ https://github.com/CordialBun/srpg-studio-plugin/tree/master/WaitTurnSystem#read
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.303
+SRPG Studio version:1.308
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -60,6 +60,7 @@ Ver.3.00 2024/11/27 拡張機能「ディレイアタック」を追加。
 Ver.3.01 2024/12/01 ユニットの装備武器の重量のみ参照する設定のとき、ユニットが装備可能な武器を所持していないとエラー落ちする不具合を修正。
 Ver.3.02 2024/12/14 時戻しシステムと併用時にマップセーブを行うと経過WTの記録や行動順リストの再構築が正常に動作しなくなる不具合を修正。
                     自軍ユニットのアタックターン中にそのユニットが撃破されたとき、WT値の更新が正常に動作しなくなる不具合を修正。
+Ver.3.10 2025/02/08 時戻しシステムの新機能追加に伴い、一部仕様を変更。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -2355,8 +2356,8 @@ var WaitTurnOrderManager = {
 
         if (REWIND_TIME_SYSTEM_COEXISTS && root.getBaseScene() === SceneType.FREE) {
             RewindTimeManager.deleteGlobalCustomProp("recordArrayJSON");
-            RewindTimeManager.deleteGlobalCustomProp("beforeChangedMapChipDictJSON");
-            RewindTimeManager.deleteGlobalCustomProp("beforeChangedLayerMapChipDictJSON");
+            RewindTimeManager.deleteGlobalCustomProp("initialMapChipArrayJSON");
+            RewindTimeManager.deleteGlobalCustomProp("initialLayerMapChipArrayJSON");
         }
     };
 
