@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-時戻しシステム Ver.2.02
+時戻しシステム Ver.2.10
 
 
 【概要】
@@ -27,7 +27,7 @@ https://github.com/CordialBun/srpg-studio-plugin/tree/master/RewindTimeSystem#re
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.304
+SRPG Studio version:1.308
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -37,10 +37,10 @@ SRPG Studio version:1.304
 ・SRPG Studioの利用規約は遵守してください。
 
 【更新履歴】
-Ver.1.0  2024/5/19  初版
-Ver.1.1  2024/5/20  古いバージョンのSRPG Studioを使用しているとレコード作成時にエラー落ちする不具合を修正。
+Ver.1.00 2024/5/19  初版
+Ver.1.10 2024/5/20  古いバージョンのSRPG Studioを使用しているとレコード作成時にエラー落ちする不具合を修正。
                     乱数取得をroot.getRandomNumber()で行っていた箇所をProbability.getRandomNumber()に変更。
-Ver.1.2  2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
+Ver.1.20 2024/5/21  時戻しの上限回数を難易度毎に設定できる機能を追加。
 Ver.1.21 2024/5/22  時戻し画面でのレコード選択でマウス操作が使えない不具合を修正。
 Ver.1.30 2024/11/03 プラグインの名称を「時戻しシステム」に変更。
                     相対ターンの巻き戻しに対応。
@@ -59,6 +59,7 @@ Ver.2.00 2024/11/30 ウェイトターンシステムとの併用に対応。
                     ユニットの所属変更の巻き戻しが正常に動作しない不具合を修正。
 Ver.2.01 2024/12/05 変数の巻き戻しが正常に動作しない不具合を修正。
 Ver.2.02 2024/12/14 ウェイトターンシステムと併用時にマップセーブを行うとレコードの保存と読み込みが正常に動作しなくなる不具合を修正。
+Ver.2.10 2025/02/08 レコードの最大保持数を設定できる機能を追加。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -81,6 +82,14 @@ var RewindCountLimit = {
     1: 10, // ID:1の難易度
     2: 3 // ID:2の難易度
 };
+
+// レコードの最大保持数
+// レコードの数が増えるにつれて、時戻し画面でのカーソル操作やセーブ/ロードなどの処理が少しずつ重くなっていくため、
+// レコードの保持数に制限をかけることでそれを防止する
+// 推奨値については、マップのサイズやユニット数、使用している他のプラグインなど様々な要素が絡んでくるので一概には言えないが、
+// まず初期値(50)で様子を見て、余裕がありそうなら増やし、ストレスを感じる程度に処理のもたつきが発生するようなら減らす、
+// という風に調整すれば間違いはないはず
+var MAX_REWIND_RECORD_COUNT = 50;
 
 // 時戻しを実行するか確認するメッセージ
 var REWIND_EXEC_QUESTION_MESSAGE = "巻き戻しますか？";
@@ -230,8 +239,8 @@ var RewindTimeManager = {
     _metamorphozeList: null,
     _recordArray: null,
     _latestRecord: null,
-    _beforeChangedMapChipDict: null,
-    _beforeChangedLayerMapChipDict: null,
+    _initialMapChipArray: null,
+    _initialLayerMapChipArray: null,
     _isIgnoredGlobalSwitchArray: null,
     _isIgnoredLocalSwitchArray: null,
     _curRecordType: 0,
@@ -266,8 +275,8 @@ var RewindTimeManager = {
         var globalCustom = this.getGlobalCustom();
 
         globalCustom.recordArrayJSON = JSONParser.stringify(this._recordArray);
-        globalCustom.beforeChangedMapChipDictJSON = JSONParser.stringify(this._beforeChangedMapChipDict);
-        globalCustom.beforeChangedLayerMapChipDictJSON = JSONParser.stringify(this._beforeChangedLayerMapChipDict);
+        globalCustom.initialMapChipArrayJSON = JSONParser.stringify(this._initialMapChipArray);
+        globalCustom.initialLayerMapChipArrayJSON = JSONParser.stringify(this._initialLayerMapChipArray);
     },
 
     initParam: function (isStartMap) {
@@ -282,8 +291,8 @@ var RewindTimeManager = {
         this._metamorphozeList = baseData.getMetamorphozeList();
 
         this.initRecordArray(isStartMap, globalCustom);
-        this.initBeforeChangedMapChipDict(isStartMap, false, globalCustom);
-        this.initBeforeChangedMapChipDict(isStartMap, true, globalCustom);
+        this.initInitialMapChipArray(isStartMap, false, globalCustom);
+        this.initInitialMapChipArray(isStartMap, true, globalCustom);
         this._latestRecord = {};
         this._isIgnoredGlobalSwitchArray = globalCustom.isIgnoredGlobalSwitchArray;
         this._isIgnoredLocalSwitchArray = globalCustom.isIgnoredLocalSwitchArray;
@@ -313,16 +322,15 @@ var RewindTimeManager = {
         }
     },
 
-    initBeforeChangedMapChipDict: function (isStartMap, isLayer, globalCustom) {
-        var key;
-        var jsonText;
+    initInitialMapChipArray: function (isStartMap, isLayer, globalCustom) {
+        var key, jsonText;
 
         if (isLayer) {
-            this._beforeChangedLayerMapChipDict = {};
-            key = "beforeChangedLayerMapChipDictJSON";
+            this._initialLayerMapChipArray = [];
+            key = "initialLayerMapChipArrayJSON";
         } else {
-            this._beforeChangedMapChipDict = {};
-            key = "beforeChangedMapChipDictJSON";
+            this._initialMapChipArray = [];
+            key = "initialMapChipArrayJSON";
         }
 
         if (isStartMap) {
@@ -337,9 +345,9 @@ var RewindTimeManager = {
         }
 
         if (isLayer) {
-            this._beforeChangedLayerMapChipDict = JSONParser.parse(jsonText);
+            this._initialLayerMapChipArray = JSONParser.parse(jsonText);
         } else {
-            this._beforeChangedMapChipDict = JSONParser.parse(jsonText);
+            this._initialMapChipArray = JSONParser.parse(jsonText);
         }
     },
 
@@ -368,7 +376,7 @@ var RewindTimeManager = {
         }
     },
 
-    rewind: function (isSelection, index) {
+    rewind: function (index, isSelection, isOperated) {
         var i, key, record;
         var metaSession = root.getMetaSession();
         var curSession = root.getCurrentSession();
@@ -485,11 +493,13 @@ var RewindTimeManager = {
                 }
             }
 
-            this._recordArray = this._recordArray.slice(0, index + 1);
-            this.updateLatestRecord();
+            if (isOperated) {
+                this._recordArray = this._recordArray.slice(0, index + 1);
+                this.updateLatestRecord();
 
-            if (WAIT_TURN_SYSTEM_COEXISTS) {
-                delete this._recordArray[this._recordArray.length - 1].actionType;
+                if (WAIT_TURN_SYSTEM_COEXISTS) {
+                    delete this._recordArray[this._recordArray.length - 1].actionType;
+                }
             }
         }
 
@@ -499,10 +509,10 @@ var RewindTimeManager = {
     },
 
     // 最新の状態(recordArrayの終端)に巻き戻す
-    rewindLatest: function (isSelection) {
+    rewindLatest: function (isSelection, isOperated) {
         var index = this._recordArray.length - 1;
 
-        this.rewind(isSelection, index);
+        this.rewind(index, isSelection, isOperated);
     },
 
     rewindAllUnit: function (unitParamArray) {
@@ -839,27 +849,32 @@ var RewindTimeManager = {
     },
 
     initMapChip: function (isLayer, curSession) {
-        var key, handleParam, beforeChangedMapChipDict;
+        var i, j, count, count2, initialMapChipArray;
         var mapX, mapY, isRuntime, resourceId, colorIndex, srcX, srcY, handle;
 
         if (isLayer) {
-            beforeChangedMapChipDict = this._beforeChangedLayerMapChipDict;
+            initialMapChipArray = this._initialLayerMapChipArray;
         } else {
-            beforeChangedMapChipDict = this._beforeChangedMapChipDict;
+            initialMapChipArray = this._initialMapChipArray;
         }
 
-        for (key in beforeChangedMapChipDict) {
-            handleParam = beforeChangedMapChipDict[key];
+        count = initialMapChipArray.length;
+        for (i = count - 1; i >= 1; i--) {
+            count2 = initialMapChipArray[i].length;
 
-            mapX = handleParam.mx;
-            mapY = handleParam.my;
-            isRuntime = handleParam.is;
-            resourceId = handleParam.id;
-            colorIndex = handleParam.c;
-            srcX = handleParam.sx;
-            srcY = handleParam.sy;
-            handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
-            curSession.setMapChipGraphicsHandle(mapX, mapY, isLayer, handle);
+            for (j = 0; j < count2; j++) {
+                handleParam = initialMapChipArray[i][j];
+
+                mapX = handleParam.mx;
+                mapY = handleParam.my;
+                isRuntime = handleParam.is;
+                resourceId = handleParam.id;
+                colorIndex = handleParam.c;
+                srcX = handleParam.sx;
+                srcY = handleParam.sy;
+                handle = root.createResourceHandle(isRuntime, resourceId, colorIndex, srcX, srcY);
+                curSession.setMapChipGraphicsHandle(mapX, mapY, isLayer, handle);
+            }
         }
     },
 
@@ -1187,6 +1202,7 @@ var RewindTimeManager = {
 
     appendRecord: function (recordType) {
         var unit, atUnit, atCount;
+        var isFirstRecord = this._recordArray.length === 0 ? true : false;
         var record = {};
         var newLatestRecord = {};
 
@@ -1247,13 +1263,73 @@ var RewindTimeManager = {
             }
         }
 
-        this.createRecord(record, newLatestRecord);
+        this._initialMapChipArray.push([]);
+        this._initialLayerMapChipArray.push([]);
+        this.createRecord(record, newLatestRecord, isFirstRecord);
         this._recordArray.push(record);
         this._latestRecord = newLatestRecord;
         this.setCurRecordType(RecordType.UNIT_WAIT);
 
         if (!WAIT_TURN_SYSTEM_COEXISTS) {
             this.setCurActionUnit(null);
+        }
+
+        // レコード数が上限を超えている場合、recordArrayのindex:1に巻き戻し、index:0のレコードを削除する
+        // その後、ユニットとマップの状態を全て記録したレコードを作成してindex:0(元々index:1だったところ)を上書きする
+        // このとき、initialMapChipArrayも先頭の要素を削除しておく
+        // 最後にrewindLatestで最新の状態に巻き戻す
+        if (this._recordArray.length > MAX_REWIND_RECORD_COUNT) {
+            this.rewind(1, true, false);
+            this.rewind(1, false, false);
+            this._recordArray = this._recordArray.slice(1);
+            this._initialLayerMapChipArray = this._initialLayerMapChipArray.slice(1);
+            this._initialMapChipArray = this._initialMapChipArray.slice(1);
+
+            isFirstRecord = true;
+            record = {};
+            newLatestRecord = {};
+            this.createRecord(record, newLatestRecord, isFirstRecord);
+
+            // 元のrecordからunitNameなど必要な情報を引き継ぐ
+            record.recordType = this._recordArray[0].recordType;
+            record.unitName = this._recordArray[0].unitName;
+
+            if (this._recordArray[0].placeCommandName !== undefined) {
+                record.placeCommandName = this._recordArray[0].placeCommandName;
+            }
+
+            if (this._recordArray[0].talkCommandName !== undefined) {
+                record.talkCommandName = this._recordArray[0].talkCommandName;
+            }
+
+            if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
+                if (this._recordArray[0].atCount !== undefined) {
+                    record.atCount = this._recordArray[0].atCount;
+                }
+
+                if (this._recordArray[0].actionType !== undefined) {
+                    record.actionType = this._recordArray[0].actionType;
+                }
+            }
+
+            if (DRAW_CHARCHIP_IN_REWIND_TITLE_WINDOW) {
+                if (this._recordArray[0].unitId !== undefined) {
+                    record.unitId = this._recordArray[0].unitId;
+                }
+
+                if (this._recordArray[0].unitSrcId !== undefined) {
+                    record.unitSrcId = this._recordArray[0].unitSrcId;
+                }
+
+                if (this._recordArray[0].unitColorIndex !== undefined) {
+                    record.unitColorIndex = this._recordArray[0].unitColorIndex;
+                }
+            }
+
+            this._recordArray[0] = record;
+
+            this.rewindLatest(true, false);
+            this.rewindLatest(false, false);
         }
     },
 
@@ -1265,12 +1341,11 @@ var RewindTimeManager = {
             return;
         }
 
-        this.createRecord(record, newLatestRecord);
+        this.createRecord(record, newLatestRecord, false);
         this._latestRecord = newLatestRecord;
     },
 
-    createRecord: function (record, newLatestRecord) {
-        var isFirstRecord = this._recordArray.length === 0 ? true : false;
+    createRecord: function (record, newLatestRecord, isFirstRecord) {
         var latestRecord = this._latestRecord;
         var metaSession = root.getMetaSession();
         var curSession = root.getCurrentSession();
@@ -2419,8 +2494,8 @@ var RewindTimeManager = {
                 ) {
                     mapChipHandleParamArray.push(mapChipHandleParam);
                     layerChipHandleParamArray.push(layerChipHandleParam);
-                    this.addBeforeChangedMapChip(latestMapChipHandleParam, false);
-                    this.addBeforeChangedMapChip(latestLayerChipHandleParam, true);
+                    this.addInitialMapChip(latestMapChipHandleParam, false);
+                    this.addInitialMapChip(latestLayerChipHandleParam, true);
                 }
 
                 newLatestMapChipHandleParamArray[y].push(newLatestMapChipHandleParam);
@@ -2579,27 +2654,20 @@ var RewindTimeManager = {
         newLatestRecord.custom = JSONParser.parse(customText);
     },
 
-    addBeforeChangedMapChip: function (latestHandleParam, isLayer) {
-        var x, y, key;
-        var beforeChangedMapChipDict;
+    addInitialMapChip: function (latestHandleParam, isLayer) {
+        var initialMapChipArray;
 
         if (latestHandleParam.mx === undefined) {
             return;
         }
 
-        x = latestHandleParam.mx;
-        y = latestHandleParam.my;
-        key = "" + x + "_" + y;
-
         if (isLayer) {
-            beforeChangedMapChipDict = this._beforeChangedLayerMapChipDict;
+            initialMapChipArray = this._initialLayerMapChipArray;
         } else {
-            beforeChangedMapChipDict = this._beforeChangedMapChipDict;
+            initialMapChipArray = this._initialMapChipArray;
         }
 
-        if (beforeChangedMapChipDict[key] === undefined) {
-            beforeChangedMapChipDict[key] = JSONParser.deepCopy(latestHandleParam);
-        }
+        initialMapChipArray[initialMapChipArray.length - 1].push(latestHandleParam);
     },
 
     setIsIgnoredSwitch: function (isGlobal, index, isIgnored) {
@@ -3467,8 +3535,8 @@ var GetNumberTokenStateType = {
 
             if (root.getBaseScene() === SceneType.FREE) {
                 RewindTimeManager.deleteGlobalCustomProp("recordArrayJSON");
-                RewindTimeManager.deleteGlobalCustomProp("beforeChangedMapChipDictJSON");
-                RewindTimeManager.deleteGlobalCustomProp("beforeChangedLayerMapChipDictJSON");
+                RewindTimeManager.deleteGlobalCustomProp("initialMapChipArrayJSON");
+                RewindTimeManager.deleteGlobalCustomProp("initialLayerMapChipArrayJSON");
             }
         };
     }
@@ -4368,7 +4436,7 @@ var GetNumberTokenStateType = {
             if (this._rewindTitleWindow.isIndexChanged()) {
                 // 巻き戻し先の状態を画面に反映
                 index = this._rewindTitleWindow.getIndex();
-                RewindTimeManager.rewind(true, index);
+                RewindTimeManager.rewind(index, true, true);
                 MapLayer.getMarkingPanel().updateMarkingPanel();
             }
 
@@ -4380,7 +4448,7 @@ var GetNumberTokenStateType = {
                     this._cancelQuestionWindow.setQuestionActive(true);
                     this.changeCycleMode(RewindTimeMode.CANCELQUESTION);
                 } else {
-                    RewindTimeManager.rewindLatest(true);
+                    RewindTimeManager.rewindLatest(true, true);
                     MapLayer.getMarkingPanel().updateMarkingPanel();
                     this._mediaManager.setMusicVolume(this._prevMusicVolume);
 
@@ -4404,7 +4472,7 @@ var GetNumberTokenStateType = {
                     }
 
                     index = this._rewindTitleWindow.getIndex();
-                    RewindTimeManager.rewind(false, index);
+                    RewindTimeManager.rewind(index, false, true);
                     RewindTimeManager.decrementRemainRewindCount();
                     this._mediaManager.setMusicVolume(this._prevMusicVolume);
 
@@ -4431,7 +4499,7 @@ var GetNumberTokenStateType = {
 
             if (result !== MoveResult.CONTINUE) {
                 if (this._cancelQuestionWindow.getQuestionAnswer() === QuestionAnswer.YES) {
-                    RewindTimeManager.rewindLatest(true);
+                    RewindTimeManager.rewindLatest(true, true);
                     MapLayer.getMarkingPanel().updateMarkingPanel();
                     this._mediaManager.setMusicVolume(this._prevMusicVolume);
 
