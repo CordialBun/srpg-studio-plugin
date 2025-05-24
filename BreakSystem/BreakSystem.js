@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------------------------------------------
 
-ブレイクシステム＆ブレイク無効スキル Ver.1.20
+ブレイクシステム Ver.1.30
 
 
 【概要】
@@ -31,6 +31,21 @@
 カスタムスキルを作成してキーワードに resistBreak を設定することでブレイク状態を無効にするスキルを実装できます。
 
 
+【ブレイクスキル・ブレイク武器】
+特定のスキルを持つユニットや特定の武器でのみブレイクできるようにしたい場合は、
+設定項目のIS_SPECIFIED_SKILL_OR_WEAPON_REQUIREDをtrueに変更し、以下の設定を行ってください。
+
+[スキル]
+カスタムスキルを作成し、キーワードに break を設定する。
+
+[武器]
+武器のカスタムパラメータに以下を設定する。
+
+{
+    isBreakWeapon: true
+}
+
+
 【ウェイトターンシステムとの併用】
 プラグイン「ウェイトターンシステム」と併用したい場合、設定項目のWAIT_TURN_SYSTEM_COEXISTSをtrueに変更してください。
 ウェイトターンシステムにおいては、ブレイク状態のユニットは自身のアタックターン開始時にブレイク状態が解除される仕様になっています。
@@ -40,7 +55,7 @@
 さんごぱん(https://twitter.com/CordialBun)
 
 【対応バージョン】
-SRPG Studio version:1.303
+SRPG Studio version:1.312
 
 【利用規約】
 ・利用はSRPG Studioを使ったゲームに限ります。
@@ -55,6 +70,8 @@ Ver.1.10 2024/11/03 ブレイク状態を無効にするスキルを実装でき
 Ver.1.20 2024/11/05 ウェイトターンシステムとの併用に対応。
                     敵AIがブレイクできる相手を優先的に狙うよう設定できる機能を追加。
                     ブレイク状態の仕様を「物理攻撃、魔法攻撃が封印され、武器の装備もできない」から「攻撃ができなくなるが、武器は装備している扱いになる」に変更。
+Ver.1.30 2025/05/24 特定のスキルを持つユニットでのみブレイクできるようにする機能を追加。
+                    特定の武器でのみブレイクできるようにする機能を追加。
 
 
 *----------------------------------------------------------------------------------------------------------------*/
@@ -65,11 +82,16 @@ Ver.1.20 2024/11/05 ウェイトターンシステムとの併用に対応。
     *----------------------------------------------------------------------------------------------------------------*/
     // ウェイトターンシステムと併用する場合はtrue、しない場合はfalse
     var WAIT_TURN_SYSTEM_COEXISTS = false;
+    // 特定のスキルを持つユニットや特定の武器でのみブレイクできるようにする場合はtrue、
+    // 全ユニットがブレイクできるようにする場合はfalse
+    var IS_SPECIFIED_SKILL_OR_WEAPON_REQUIRED = false;
     // ブレイク状態のステートのID
     var BREAK_STATE_ID = 6;
     // 敵AIがブレイクできる相手を狙う優先度
     // 1なら通常と同じで、1より大きければ大きいほど優先して狙う
     var BREAK_PRIORITY_RATE = 1.5;
+    // 武器の情報ウィンドウに表示する文字列
+    var BREAK_WEAPON_SENTENCE_TEXT = "ブレイク";
 
     /*-----------------------------------------------------------------------------------------------------------------
         戦闘を仕掛けた側のユニットに印をつけておく
@@ -87,15 +109,22 @@ Ver.1.20 2024/11/05 ウェイトターンシステムとの併用に対応。
     var alias001 = AttackEvaluator.HitCritical._checkStateAttack;
     AttackEvaluator.HitCritical._checkStateAttack = function (virtualActive, virtualPassive, attackEntry) {
         alias001.call(this, virtualActive, virtualPassive, attackEntry);
-        var state;
+        var isBreakWeapon, breakSkill, state;
         var active = virtualActive.unitSelf;
         var passive = virtualPassive.unitSelf;
         var weapon = virtualActive.weapon;
         var isPreemptive = virtualActive.isPreemptive;
         var compatible = CompatibleCalculator._getCompatible(active, passive, weapon);
-        var skill = SkillControl.getPossessionCustomSkill(passive, "resistBreak");
+        var resistSkill = SkillControl.getPossessionCustomSkill(passive, "resistBreak");
+        var isApplicable = isPreemptive && compatible !== null && resistSkill === null;
 
-        if (isPreemptive && compatible !== null && skill === null) {
+        if (IS_SPECIFIED_SKILL_OR_WEAPON_REQUIRED) {
+            isBreakWeapon = typeof weapon.custom.isBreakWeapon === "boolean" && weapon.custom.isBreakWeapon;
+            breakSkill = SkillControl.getPossessionCustomSkill(active, "break");
+            isApplicable = isApplicable && (isBreakWeapon || breakSkill !== null);
+        }
+
+        if (isApplicable) {
             state = root.getBaseData().getStateList().getDataFromId(BREAK_STATE_ID);
 
             // 既にブレイク状態になっている場合、重ねがけはしない
@@ -235,4 +264,36 @@ Ver.1.20 2024/11/05 ウェイトターンシステムとの併用に対応。
             }
         };
     }
+
+    /*-----------------------------------------------------------------------------------------------------------------
+        武器の情報ウィンドウに項目を追加する
+    *----------------------------------------------------------------------------------------------------------------*/
+    var alias007 = ItemInfoWindow._configureWeapon;
+    ItemInfoWindow._configureWeapon = function (groupArray) {
+        alias007.call(this, groupArray);
+
+        groupArray.appendObject(ItemSentence.BreakWeapon);
+    };
+
+    ItemSentence.BreakWeapon = defineObject(BaseItemSentence, {
+        drawItemSentence: function (x, y, item) {
+            if (this.getItemSentenceCount(item) === 1) {
+                ItemInfoRenderer.drawKeyword(x, y, BREAK_WEAPON_SENTENCE_TEXT);
+            }
+        },
+
+        getItemSentenceCount: function (item) {
+            var isBreakWeapon = typeof item.custom.isBreakWeapon === "boolean" && item.custom.isBreakWeapon;
+
+            if (IS_SPECIFIED_SKILL_OR_WEAPON_REQUIRED && isBreakWeapon) {
+                return 1;
+            }
+
+            return 0;
+        },
+
+        getTextUI: function () {
+            return root.queryTextUI("default_window");
+        }
+    });
 })();
