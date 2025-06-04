@@ -3,7 +3,7 @@
 戦略的な駆け引きを生み出す「ブレイクシステム」を実装するプラグインです。  
 相性有利な武器での攻撃が命中した際に、相手ユニットを「ブレイク状態」にして反撃を封じることができます。
 
-[![Version](https://img.shields.io/badge/version-1.33-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-1.31-blue.svg)]()
 [![SRPG Studio](https://img.shields.io/badge/SRPG%20Studio-1.313-green.svg)]()
 
 ## 📋 機能
