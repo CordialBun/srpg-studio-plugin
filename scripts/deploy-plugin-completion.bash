@@ -18,9 +18,25 @@ _deploy_plugin_completion() {
             local script_path="${COMP_WORDS[0]}"
             local available_plugins
             
+            # スクリプトの実際のパスを取得
+            local actual_path="$script_path"
+            
+            # エイリアスの場合は実際のパスを取得
+            if alias "$script_path" >/dev/null 2>&1; then
+                actual_path=$(alias "$script_path" | sed "s/alias $script_path='//;s/'$//")
+            elif ! command -v "$script_path" >/dev/null 2>&1; then
+                # コマンドが見つからない場合のフォールバック
+                # deploy-plugin.sh or deploy-plugin-completion.bash がある場所から推測
+                local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                local fallback_path="$script_dir/deploy-plugin.sh"
+                if [ -x "$fallback_path" ]; then
+                    actual_path="$fallback_path"
+                fi
+            fi
+            
             # スクリプトから利用可能なプラグインを取得
-            if [ -x "$script_path" ]; then
-                available_plugins=$("$script_path" --list-plugins-only 2>/dev/null)
+            if [ -x "$actual_path" ]; then
+                available_plugins=$("$actual_path" --list-plugins-only 2>/dev/null)
             fi
             
             # 基本オプション

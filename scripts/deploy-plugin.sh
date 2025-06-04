@@ -101,7 +101,7 @@ deploy_plugin() {
     
     local copied_files=0
     
-    # JavaScriptファイルをコピー
+    # JavaScriptファイルのみをコピー（SRPG Studioの仕様に準拠）
     local js_files=("$source_dir"/*.js)
     if [ -f "${js_files[0]}" ]; then
         for js_file in "${js_files[@]}"; do
@@ -116,29 +116,12 @@ deploy_plugin() {
         log_warning "  JavaScriptファイルが見つかりません"
     fi
     
-    # READMEファイルをコピー（存在する場合）
-    if [ -f "$source_dir/README.md" ]; then
-        cp "$source_dir/README.md" "$target_plugin_dir/"
-        log_success "  ✓ README.md をコピーしました"
-        copied_files=$((copied_files + 1))
-    fi
-    
-    # リソースファイルのコピー（Image系ディレクトリ）
-    for resource_dir in "$source_dir"/*Image*; do
-        if [ -d "$resource_dir" ]; then
-            local resource_dir_name=$(basename "$resource_dir")
-            cp -r "$resource_dir" "$target_plugin_dir/"
-            log_success "  ✓ $resource_dir_name/ ディレクトリをコピーしました"
-            copied_files=$((copied_files + 1))
-        fi
-    done
-    
     if [ $copied_files -eq 0 ]; then
         log_warning "$plugin_name: コピーできるファイルが見つかりませんでした"
         return 1
     fi
     
-    log_success "$plugin_name のデプロイが完了しました ($copied_files ファイル/ディレクトリ)"
+    log_success "$plugin_name のデプロイが完了しました ($copied_files ファイル)"
     return 0
 }
 
